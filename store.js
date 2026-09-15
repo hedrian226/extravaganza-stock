@@ -160,6 +160,54 @@ const Store = {
     return data.user;
   },
 
+  async logActivity(action, itemId = null, itemName = null, details = '') {
+    const user = await this.getCurrentUser();
+    if (!user) return false;
+    const { error } = await supabaseClient.from('activity_logs').insert({
+      user_id: user.id,
+      action: String(action || 'activity'),
+      item_id: itemId || null,
+      item_name: itemName || null,
+      details: String(details || ''),
+    });
+    if (error) {
+      console.warn('Activity log unavailable:', error.message || error);
+      return false;
+    }
+    return true;
+  },
+
+  async getActivityLog(limit = 40) {
+    const user = await this.getCurrentUser();
+    if (!user) return [];
+    const { data, error } = await supabaseClient
+      .from('activity_logs')
+      .select('id,action,item_id,item_name,details,created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(Math.min(Math.max(Number(limit) || 40, 1), 100));
+    if (error) throw error;
+    const labels = {
+      login: 'Signed in',
+      add_item: 'Added item',
+      update_item: 'Edited item',
+      adjust_quantity: 'Adjusted quantity',
+      undo_quantity: 'Undid quantity change',
+      delete_item: 'Deleted item',
+      import_stock: 'Imported stock',
+      settings_change: 'Changed settings',
+    };
+    return (data || []).map(row => ({
+      id: row.id,
+      actionLabel: labels[row.action] || row.action || 'Activity',
+      itemName: row.item_name || '',
+      details: row.item_name && row.details && !String(row.details).toLowerCase().includes(String(row.item_name).toLowerCase())
+        ? `${row.item_name} — ${row.details}`
+        : (row.details || row.item_name || ''),
+      createdAt: row.created_at,
+    }));
+  },
+
   async signOut() {
     const { error } = await supabaseClient.auth.signOut();
     if (error) throw error;

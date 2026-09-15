@@ -13,8 +13,8 @@
   --bad:#b06a56;
   --warn:#cf9a3d;
   --radius:2px;
-  --serif: 'Cormorant Garamond', serif;
-  --sans: 'Jost', sans-serif;
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans: 'DM Sans', Arial, sans-serif;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
