@@ -4,6 +4,16 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Extravaganza Beauté — Stock</title>
+<meta name="description" content="Check what's currently in stock at Extravaganza Beauté.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0a08">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EB Stock">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -37,6 +47,7 @@
       </div>
       <div class="error-msg" id="vg-error"></div>
       <button class="btn primary full" id="vg-submit">View stock</button>
+      <p class="auth-footnote" id="vg-lock-note" style="display:none;"></p>
     </div>
   </div>
 </div>
@@ -52,8 +63,9 @@
   </div>
 
   <div class="container">
-    <div class="stats-strip two-col">
+    <div class="stats-strip">
       <div class="stat ok"><div class="stat-num" id="stat-in">0</div><div class="stat-label">Has stock</div></div>
+      <div class="stat warn"><div class="stat-num" id="stat-low">0</div><div class="stat-label">Low stock</div></div>
       <div class="stat bad"><div class="stat-num" id="stat-out">0</div><div class="stat-label">No stock</div></div>
     </div>
 
@@ -62,6 +74,7 @@
       <select id="filter-status">
         <option value="">All items</option>
         <option value="in">Has stock</option>
+        <option value="low">Low stock</option>
         <option value="out">No stock</option>
       </select>
       <select id="sort-select">
@@ -89,6 +102,7 @@
 const SS_SESSION = 'exb_viewer_session';
 let session = null;
 let viewerProducts = [];
+let lowStockThreshold = 5;
 
 function loadSession() {
   const raw = sessionStorage.getItem(SS_SESSION);
@@ -117,6 +131,7 @@ async function boot() {
       const result = await Store.getViewerProducts(session.code);
       if (result.ok) {
         viewerProducts = result.products;
+        lowStockThreshold = result.lowStockThreshold;
         await enterApp();
         return;
       }
@@ -127,12 +142,51 @@ async function boot() {
   }
 
   showScreen('screen-gate');
+  const lock = AccessGate.checkLock();
+  if (lock.locked) showLockNote(lock.remainingMs);
+}
+
+let lockCountdownTimer = null;
+
+function formatRemaining(ms) {
+  const s = Math.ceil(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.ceil(s / 60)}m`;
+}
+
+function showLockNote(remainingMs) {
+  const note = document.getElementById('vg-lock-note');
+  const button = document.getElementById('vg-submit');
+  clearInterval(lockCountdownTimer);
+
+  function tick() {
+    const { locked, remainingMs: left } = AccessGate.checkLock();
+    if (!locked) {
+      note.style.display = 'none';
+      button.disabled = false;
+      button.textContent = 'View stock';
+      clearInterval(lockCountdownTimer);
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Try again later';
+    note.style.display = 'block';
+    note.textContent = `Too many incorrect attempts. Try again in ${formatRemaining(left)}.`;
+  }
+  tick();
+  lockCountdownTimer = setInterval(tick, 1000);
 }
 
 document.getElementById('vg-submit').addEventListener('click', async () => {
   const code = document.getElementById('vg-code').value.trim();
   const err = document.getElementById('vg-error');
   err.textContent = '';
+
+  const lock = AccessGate.checkLock();
+  if (lock.locked) {
+    showLockNote(lock.remainingMs);
+    return;
+  }
 
   if (!code) {
     err.textContent = 'Enter the access code.';
@@ -146,19 +200,29 @@ document.getElementById('vg-submit').addEventListener('click', async () => {
   try {
     const result = await Store.getViewerProducts(code);
     if (!result.ok) {
-      err.textContent = 'Incorrect access code.';
+      AccessGate.recordFailure();
+      const after = AccessGate.checkLock();
+      if (after.locked) {
+        showLockNote(after.remainingMs);
+      } else {
+        err.textContent = 'Incorrect access code.';
+      }
       return;
     }
 
+    AccessGate.recordSuccess();
     viewerProducts = result.products;
+    lowStockThreshold = result.lowStockThreshold;
     setSession(code);
     await enterApp();
   } catch (e) {
     console.error(e);
     err.textContent = 'Could not connect to the stock database. Please try again.';
   } finally {
-    button.disabled = false;
-    button.textContent = 'View stock';
+    if (!AccessGate.checkLock().locked) {
+      button.disabled = false;
+      button.textContent = 'View stock';
+    }
   }
 });
 
@@ -179,7 +243,8 @@ async function enterApp() {
 let refreshTimer = null;
 const AUTO_REFRESH_MS = 15000;
 
-function productsChanged(next) {
+function productsChanged(next, nextThreshold) {
+  if (nextThreshold !== lowStockThreshold) return true;
   if (next.length !== viewerProducts.length) return true;
   const key = p => `${p.id}:${p.quantity}:${p.name}`;
   const a = viewerProducts.map(key).sort().join('|');
@@ -191,8 +256,9 @@ async function pollForUpdates() {
   if (!session?.code || document.hidden) return;
   try {
     const result = await Store.getViewerProducts(session.code);
-    if (result.ok && productsChanged(result.products)) {
+    if (result.ok && productsChanged(result.products, result.lowStockThreshold)) {
       viewerProducts = result.products;
+      lowStockThreshold = result.lowStockThreshold;
       renderStats(viewerProducts);
       renderGrid(viewerProducts);
     }
@@ -218,7 +284,10 @@ async function renderAll() {
   if (session?.code) {
     try {
       const result = await Store.getViewerProducts(session.code);
-      if (result.ok) viewerProducts = result.products;
+      if (result.ok) {
+        viewerProducts = result.products;
+        lowStockThreshold = result.lowStockThreshold;
+      }
     } catch (e) {
       console.error(e);
     }
@@ -228,9 +297,15 @@ async function renderAll() {
 }
 
 function renderStats(products) {
-  let inCount = 0, outCount = 0;
-  products.forEach(p => { if (computeStatus(p).key === 'in') inCount++; else outCount++; });
+  let inCount = 0, lowCount = 0, outCount = 0;
+  products.forEach(p => {
+    const key = computeStatus(p, lowStockThreshold).key;
+    if (key === 'in') inCount++;
+    else if (key === 'low') lowCount++;
+    else outCount++;
+  });
   document.getElementById('stat-in').textContent = inCount;
+  document.getElementById('stat-low').textContent = lowCount;
   document.getElementById('stat-out').textContent = outCount;
 }
 
@@ -241,7 +316,7 @@ function getFilteredSorted(products) {
 
   let list = products.filter(p => {
     const matchesQ = !q || (p.name || '').toLowerCase().includes(q);
-    const matchesStatus = !statusFilter || computeStatus(p).key === statusFilter;
+    const matchesStatus = !statusFilter || computeStatus(p, lowStockThreshold).key === statusFilter;
     return matchesQ && matchesStatus;
   });
 
@@ -270,7 +345,7 @@ function renderGrid(products) {
   empty.style.display = 'none';
 
   grid.innerHTML = list.map(p => {
-    const status = computeStatus(p);
+    const status = computeStatus(p, lowStockThreshold);
     const qty = Number(p.quantity) || 0;
     return `
       <div class="item-card" data-id="${p.id}">

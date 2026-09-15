@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Extravaganza Beauté — Manage Stock</title>
 <meta name="robots" content="noindex, nofollow" />
+<link rel="manifest" href="manager-manifest.json">
+<meta name="theme-color" content="#0b0a08">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EB Manage">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -75,9 +84,10 @@
   </div>
 
   <div class="container">
-    <div class="stats-strip">
+    <div class="stats-strip four-col">
       <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Items tracked</div></div>
       <div class="stat ok"><div class="stat-num" id="stat-in">0</div><div class="stat-label">Has stock</div></div>
+      <div class="stat warn"><div class="stat-num" id="stat-low">0</div><div class="stat-label">Low stock</div></div>
       <div class="stat bad"><div class="stat-num" id="stat-out">0</div><div class="stat-label">No stock</div></div>
     </div>
 
@@ -86,6 +96,7 @@
       <select id="filter-status">
         <option value="">All items</option>
         <option value="in">Has stock</option>
+        <option value="low">Low stock</option>
         <option value="out">No stock</option>
       </select>
       <select id="sort-select">
@@ -118,6 +129,7 @@
         <div class="field"><label for="s-password">New password</label><input type="password" id="s-password" placeholder="Leave blank to keep current" /></div>
       </div>
       <div class="field"><label for="s-viewcode">New viewer access code</label><input type="text" id="s-viewcode" placeholder="Leave blank to keep current" /></div>
+      <div class="field"><label for="s-lowstock">Low stock warning at or below</label><input type="number" id="s-lowstock" min="0" step="1" placeholder="e.g. 5" /></div>
       <div class="error-msg" id="settings-error"></div>
       <div class="panel-actions">
         <button class="btn primary" id="save-settings-btn">Save settings</button>
@@ -139,9 +151,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="store.js"></script>
+<script src="ui.js"></script>
 <script src="effects.js"></script>
 <script>
 let editingId = null;
+let lowStockThreshold = 5;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -209,6 +223,12 @@ const pendingWrites = {}; // id -> timeout handle, so rapid clicks coalesce into
 
 async function enterApp() {
   showScreen('screen-app');
+  try {
+    const settings = await Store.getAppSettings();
+    lowStockThreshold = settings.lowStockThreshold;
+  } catch (e) {
+    console.error(e);
+  }
   await renderAll();
 }
 
@@ -227,10 +247,16 @@ async function renderAll() {
 }
 
 function renderStats(products) {
-  let inCount = 0, outCount = 0;
-  products.forEach(p => { if (computeStatus(p).key === 'in') inCount++; else outCount++; });
+  let inCount = 0, lowCount = 0, outCount = 0;
+  products.forEach(p => {
+    const key = computeStatus(p, lowStockThreshold).key;
+    if (key === 'in') inCount++;
+    else if (key === 'low') lowCount++;
+    else outCount++;
+  });
   document.getElementById('stat-total').textContent = products.length;
   document.getElementById('stat-in').textContent = inCount;
+  document.getElementById('stat-low').textContent = lowCount;
   document.getElementById('stat-out').textContent = outCount;
 }
 
@@ -241,7 +267,7 @@ function getFilteredSorted(products) {
 
   let list = products.filter(p => {
     const matchesQ = !q || (p.name || '').toLowerCase().includes(q);
-    const matchesStatus = !statusFilter || computeStatus(p).key === statusFilter;
+    const matchesStatus = !statusFilter || computeStatus(p, lowStockThreshold).key === statusFilter;
     return matchesQ && matchesStatus;
   });
 
@@ -270,7 +296,7 @@ function renderGrid(products) {
   empty.style.display = 'none';
 
   grid.innerHTML = list.map(p => {
-    const status = computeStatus(p);
+    const status = computeStatus(p, lowStockThreshold);
     const qty = Number(p.quantity) || 0;
     return `
       <div class="item-card" data-id="${p.id}">
@@ -304,7 +330,7 @@ function updateCardDOM(id, qty) {
   if (numEl) numEl.textContent = qty;
   const pill = card.querySelector('.status-pill');
   if (pill) {
-    const status = computeStatus({ quantity: qty });
+    const status = computeStatus({ quantity: qty }, lowStockThreshold);
     pill.className = `status-pill status-${status.key}`;
     pill.innerHTML = `<span class="status-dot"></span>${status.label}`;
   }
@@ -331,7 +357,7 @@ function quickAdjust(id, delta) {
     try {
       await Store.updateProduct(id, { quantity: next });
     } catch (e) {
-      alert(e.message || 'Could not update quantity.');
+      await UI.alert(e.message || 'Could not update quantity.', 'Update failed');
       await renderAll(); // re-sync with the server if the save failed
     }
   }, 350);
@@ -377,7 +403,7 @@ async function openEdit(id) {
     document.getElementById('item-panel').classList.add('open');
     document.getElementById('f-name').focus();
   } catch (e) {
-    alert(e.message || 'Could not load item.');
+    await UI.alert(e.message || 'Could not load item.', 'Something went wrong');
   }
 }
 
@@ -408,11 +434,17 @@ async function handleDelete(id) {
     const products = await Store.getProducts();
     const p = products.find(x => String(x.id) === String(id));
     if (!p) return;
-    if (!confirm(`Remove "${p.name}" from the list?`)) return;
+    const confirmed = await UI.confirm(`Remove "${p.name}" from the list?`, {
+      title: 'Delete item',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    if (!confirmed) return;
     await Store.deleteProduct(id);
     await renderAll();
   } catch (e) {
-    alert(e.message || 'Could not delete item.');
+    await UI.alert(e.message || 'Could not delete item.', 'Delete failed');
   }
 }
 
@@ -422,6 +454,7 @@ document.getElementById('settings-btn').addEventListener('click', async () => {
   document.getElementById('s-username').value = user?.email || '';
   document.getElementById('s-password').value = '';
   document.getElementById('s-viewcode').value = '';
+  document.getElementById('s-lowstock').value = lowStockThreshold;
   document.getElementById('settings-error').textContent = '';
   document.getElementById('settings-panel').classList.add('open');
 });
@@ -431,10 +464,13 @@ document.getElementById('cancel-settings-btn').addEventListener('click', closePa
 document.getElementById('save-settings-btn').addEventListener('click', async () => {
   const password = document.getElementById('s-password').value;
   const viewcode = document.getElementById('s-viewcode').value.trim();
+  const lowstockRaw = document.getElementById('s-lowstock').value.trim();
   const err = document.getElementById('settings-error');
   err.textContent = '';
 
-  if (!password && !viewcode) {
+  const lowstockChanged = lowstockRaw !== '' && Number(lowstockRaw) !== lowStockThreshold;
+
+  if (!password && !viewcode && !lowstockChanged) {
     closePanels();
     return;
   }
@@ -446,10 +482,20 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
     err.textContent = 'Viewer access code should be at least 6 characters.';
     return;
   }
+  if (lowstockRaw !== '' && (!/^\d+$/.test(lowstockRaw) || Number(lowstockRaw) < 0)) {
+    err.textContent = 'Low stock number should be 0 or more.';
+    return;
+  }
 
   try {
     if (password) await Store.updatePassword(password);
     if (viewcode) await Store.setViewerCode(viewcode);
+    if (lowstockChanged) {
+      await Store.setLowStockThreshold(Number(lowstockRaw));
+      lowStockThreshold = Number(lowstockRaw);
+      renderStats(currentProducts);
+      renderGrid(currentProducts);
+    }
     closePanels();
   } catch (e) {
     console.error(e);

@@ -121,7 +121,29 @@ const Store = {
     return {
       ok: Boolean(data?.ok),
       products: Array.isArray(data?.items) ? data.items.map(mapItem) : [],
+      lowStockThreshold: Number.isFinite(Number(data?.lowStockThreshold))
+        ? Number(data.lowStockThreshold)
+        : DEFAULT_LOW_STOCK_THRESHOLD,
     };
+  },
+
+  /* manager's own low-stock threshold (used to color-code the dashboard) */
+  async getAppSettings() {
+    const { data, error } = await supabaseClient.rpc('get_app_settings');
+    if (error) throw error;
+    return {
+      lowStockThreshold: Number.isFinite(Number(data?.lowStockThreshold))
+        ? Number(data.lowStockThreshold)
+        : DEFAULT_LOW_STOCK_THRESHOLD,
+    };
+  },
+
+  async setLowStockThreshold(threshold) {
+    const { error } = await supabaseClient.rpc('set_low_stock_threshold', {
+      p_threshold: Number(threshold),
+    });
+    if (error) throw error;
+    return true;
   },
 
   async updatePassword(password) {
@@ -144,10 +166,63 @@ const Store = {
   },
 };
 
-function computeStatus(product) {
+const DEFAULT_LOW_STOCK_THRESHOLD = 5;
+
+function computeStatus(product, threshold) {
   const qty = Number(product.quantity) || 0;
-  return qty > 0 ? { key: 'in', label: 'Has stock' } : { key: 'out', label: 'No stock' };
+  const t = Number.isFinite(Number(threshold)) ? Number(threshold) : DEFAULT_LOW_STOCK_THRESHOLD;
+  if (qty <= 0) return { key: 'out', label: 'No stock' };
+  if (qty <= t) return { key: 'low', label: 'Low stock' };
+  return { key: 'in', label: 'Has stock' };
 }
+
+/* ---------------------------------------------------------------------
+   ACCESS-CODE GUARD — basic client-side brute-force throttle for the
+   viewer gate. This raises the bar against casual/automated guessing
+   from the sign-in form; it isn't a substitute for server-side limits,
+   but it's a reasonable safeguard for a small shop's use case.
+   ------------------------------------------------------------------- */
+const AccessGate = (function () {
+  const KEY = 'exb_gate_state';
+  const FREE_ATTEMPTS = 3;              // this many misses before any wait
+  const LOCK_SCHEDULE_MS = [15000, 30000, 60000, 120000, 300000]; // 15s..5min
+
+  function read() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : { fails: 0, lockUntil: 0 };
+    } catch (e) {
+      return { fails: 0, lockUntil: 0 };
+    }
+  }
+  function write(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+
+  return {
+    /** Returns { locked, remainingMs } — call before submitting. */
+    checkLock() {
+      const state = read();
+      const remaining = state.lockUntil - Date.now();
+      if (remaining > 0) return { locked: true, remainingMs: remaining };
+      return { locked: false, remainingMs: 0 };
+    },
+    recordFailure() {
+      const state = read();
+      state.fails = (state.fails || 0) + 1;
+      const overBy = state.fails - FREE_ATTEMPTS;
+      if (overBy > 0) {
+        const idx = Math.min(overBy - 1, LOCK_SCHEDULE_MS.length - 1);
+        state.lockUntil = Date.now() + LOCK_SCHEDULE_MS[idx];
+      }
+      write(state);
+      return state;
+    },
+    recordSuccess() {
+      write({ fails: 0, lockUntil: 0 });
+    },
+  };
+})();
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({
