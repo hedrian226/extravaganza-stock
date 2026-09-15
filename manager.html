@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Extravaganza Beauté — Manage Stock</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ========================= SETUP (first run only) ========================= -->
+<div class="screen active" id="screen-setup">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <span class="wordmark">Extravaganza<span> Beauté</span></span>
+      <div class="auth-sub">MANAGE STOCK</div>
+      <h1 class="auth-title">Set up your account</h1>
+      <p class="auth-hint">First time here. Create the login you'll use to add and update stock, and an access code to share with whoever checks it.</p>
+
+      <div class="field">
+        <label for="su-username">Username</label>
+        <input type="text" id="su-username" autocomplete="off" placeholder="e.g. your name" />
+      </div>
+      <div class="field">
+        <label for="su-password">Password</label>
+        <input type="password" id="su-password" autocomplete="new-password" placeholder="At least 6 characters" />
+      </div>
+      <div class="field">
+        <label for="su-viewcode">Viewer access code</label>
+        <input type="text" id="su-viewcode" autocomplete="off" placeholder="Code you'll share with the checker" />
+      </div>
+      <div class="error-msg" id="su-error"></div>
+      <button class="btn primary full" id="su-submit">Create account</button>
+      <p class="auth-footnote">Stored only in this browser for now. Connect Supabase to make this a real account.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= LOGIN ========================= -->
+<div class="screen" id="screen-login">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <span class="wordmark">Extravaganza<span> Beauté</span></span>
+      <div class="auth-sub">MANAGE STOCK</div>
+      <h1 class="auth-title">Sign in</h1>
+      <p class="auth-hint">Enter your username and password to add or update stock.</p>
+      <div class="field">
+        <label for="ml-username">Username</label>
+        <input type="text" id="ml-username" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="ml-password">Password</label>
+        <input type="password" id="ml-password" autocomplete="current-password" />
+      </div>
+      <div class="error-msg" id="ml-error"></div>
+      <button class="btn primary full" id="ml-submit">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= APP (inputer dashboard) ========================= -->
+<div class="screen" id="screen-app">
+  <div class="topbar">
+    <span class="wordmark">Extravaganza<span> Beauté</span></span>
+    <div class="topbar-right">
+      <span class="role-tag manager">INPUTER</span>
+      <a class="btn ghost small" href="index.html" target="_blank" rel="noopener">View viewer page</a>
+      <button class="btn ghost small" id="settings-btn">Settings</button>
+      <button class="btn ghost small" id="signout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="stats-strip">
+      <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Items tracked</div></div>
+      <div class="stat ok"><div class="stat-num" id="stat-in">0</div><div class="stat-label">Has stock</div></div>
+      <div class="stat bad"><div class="stat-num" id="stat-out">0</div><div class="stat-label">No stock</div></div>
+    </div>
+
+    <div class="controls">
+      <input type="text" id="search-input" placeholder="Search item" />
+      <select id="filter-status">
+        <option value="">All items</option>
+        <option value="in">Has stock</option>
+        <option value="out">No stock</option>
+      </select>
+      <select id="sort-select">
+        <option value="name">Sort: Name A–Z</option>
+        <option value="updated">Sort: Recently updated</option>
+      </select>
+      <button class="btn primary" id="add-btn">Add item</button>
+    </div>
+
+    <!-- add / edit panel -->
+    <div class="panel" id="item-panel">
+      <h3 class="panel-title" id="panel-title">Add item</h3>
+      <input type="hidden" id="item-id" />
+      <div class="panel-grid">
+        <div class="field"><label for="f-name">Item name</label><input type="text" id="f-name" placeholder="e.g. Dish soap"/></div>
+        <div class="field"><label for="f-qty">Quantity</label><input type="number" id="f-qty" min="0" step="1" /></div>
+      </div>
+      <div class="error-msg" id="panel-error"></div>
+      <div class="panel-actions">
+        <button class="btn primary" id="save-item-btn">Save item</button>
+        <button class="btn ghost" id="cancel-item-btn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- settings panel -->
+    <div class="panel" id="settings-panel">
+      <h3 class="panel-title">Settings</h3>
+      <div class="panel-grid">
+        <div class="field"><label for="s-username">Username</label><input type="text" id="s-username" /></div>
+        <div class="field"><label for="s-password">Password</label><input type="password" id="s-password" placeholder="Leave blank to keep current" /></div>
+      </div>
+      <div class="field"><label for="s-viewcode">Viewer access code</label><input type="text" id="s-viewcode" /></div>
+      <div class="error-msg" id="settings-error"></div>
+      <div class="panel-actions">
+        <button class="btn primary" id="save-settings-btn">Save settings</button>
+        <button class="btn ghost" id="cancel-settings-btn">Cancel</button>
+      </div>
+    </div>
+
+    <div id="grid-wrap">
+      <div class="stock-grid" id="stock-grid"></div>
+      <div class="empty-state" id="empty-state" style="display:none;">
+        <h3 id="empty-title">No items yet</h3>
+        <p id="empty-sub">Add your first item to start tracking stock.</p>
+      </div>
+    </div>
+
+    <p class="footnote">Data in this preview is stored in this browser only, so it won't sync across devices yet. Connect Supabase to make it live everywhere.</p>
+  </div>
+</div>
+
+<script src="store.js"></script>
+<script>
+const SS_SESSION = 'exb_manager_session';
+let session = null;
+let editingId = null;
+
+function loadSession() {
+  const raw = sessionStorage.getItem(SS_SESSION);
+  session = raw ? JSON.parse(raw) : null;
+}
+function setSession() {
+  session = { signedIn: true };
+  sessionStorage.setItem(SS_SESSION, JSON.stringify(session));
+}
+function clearSession() {
+  session = null;
+  sessionStorage.removeItem(SS_SESSION);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+async function boot() {
+  loadSession();
+  const cfg = await Store.getConfig();
+
+  if (!cfg || !cfg.manager || !cfg.manager.username) {
+    showScreen('screen-setup');
+    return;
+  }
+  if (session && session.signedIn) {
+    await enterApp();
+  } else {
+    showScreen('screen-login');
+  }
+}
+
+/* ---- setup ---- */
+document.getElementById('su-submit').addEventListener('click', async () => {
+  const username = document.getElementById('su-username').value.trim();
+  const password = document.getElementById('su-password').value;
+  const viewcode = document.getElementById('su-viewcode').value.trim();
+  const err = document.getElementById('su-error');
+  err.textContent = '';
+
+  if (!username || !password || !viewcode) {
+    err.textContent = 'Please fill in all three fields.';
+    return;
+  }
+  if (password.length < 6) {
+    err.textContent = 'Password should be at least 6 characters.';
+    return;
+  }
+
+  await Store.setConfig({ manager: { username, password }, viewerCode: viewcode });
+  setSession();
+  await enterApp();
+});
+
+/* ---- login ---- */
+document.getElementById('ml-submit').addEventListener('click', async () => {
+  const username = document.getElementById('ml-username').value.trim();
+  const password = document.getElementById('ml-password').value;
+  const err = document.getElementById('ml-error');
+  err.textContent = '';
+
+  const cfg = await Store.getConfig();
+  if (cfg && cfg.manager && cfg.manager.username === username && cfg.manager.password === password) {
+    setSession();
+    await enterApp();
+  } else {
+    err.textContent = 'Incorrect username or password.';
+  }
+});
+
+/* ---- sign out ---- */
+document.getElementById('signout-btn').addEventListener('click', () => {
+  clearSession();
+  closePanels();
+  document.getElementById('ml-username').value = '';
+  document.getElementById('ml-password').value = '';
+  showScreen('screen-login');
+});
+
+/* ---- app ---- */
+async function enterApp() {
+  showScreen('screen-app');
+  await renderAll();
+}
+
+async function renderAll() {
+  const products = await Store.getProducts();
+  renderStats(products);
+  renderGrid(products);
+}
+
+function renderStats(products) {
+  let inCount = 0, outCount = 0;
+  products.forEach(p => { if (computeStatus(p).key === 'in') inCount++; else outCount++; });
+  document.getElementById('stat-total').textContent = products.length;
+  document.getElementById('stat-in').textContent = inCount;
+  document.getElementById('stat-out').textContent = outCount;
+}
+
+function getFilteredSorted(products) {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const statusFilter = document.getElementById('filter-status').value;
+  const sortBy = document.getElementById('sort-select').value;
+
+  let list = products.filter(p => {
+    const matchesQ = !q || (p.name || '').toLowerCase().includes(q);
+    const matchesStatus = !statusFilter || computeStatus(p).key === statusFilter;
+    return matchesQ && matchesStatus;
+  });
+
+  list.sort((a, b) => {
+    if (sortBy === 'updated') return new Date(b.updatedAt) - new Date(a.updatedAt);
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  return list;
+}
+
+function renderGrid(products) {
+  const list = getFilteredSorted(products);
+  const grid = document.getElementById('stock-grid');
+  const empty = document.getElementById('empty-state');
+
+  if (list.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    document.getElementById('empty-title').textContent = products.length === 0 ? 'No items yet' : 'No matches';
+    document.getElementById('empty-sub').textContent = products.length === 0
+      ? 'Add your first item to start tracking stock.'
+      : 'Try a different search or filter.';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = list.map(p => {
+    const status = computeStatus(p);
+    const qty = Number(p.quantity) || 0;
+    return `
+      <div class="item-card" data-id="${p.id}">
+        <div class="item-name">${escapeHtml(p.name)}</div>
+        <span class="status-pill status-${status.key}"><span class="status-dot"></span>${status.label}</span>
+        <div class="qty-row">
+          <div class="stepper">
+            <button class="step-btn minus-btn" data-id="${p.id}" aria-label="Decrease quantity">−</button>
+            <span class="qty-num">${qty}</span>
+            <button class="step-btn plus-btn" data-id="${p.id}" aria-label="Increase quantity">+</button>
+          </div>
+          <div class="card-actions">
+            <button class="icon-btn edit-btn" title="Edit" data-id="${p.id}">✎</button>
+            <button class="icon-btn del del-btn" title="Delete" data-id="${p.id}">✕</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  grid.querySelectorAll('.plus-btn').forEach(btn => btn.addEventListener('click', () => quickAdjust(btn.dataset.id, 1)));
+  grid.querySelectorAll('.minus-btn').forEach(btn => btn.addEventListener('click', () => quickAdjust(btn.dataset.id, -1)));
+  grid.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.id)));
+  grid.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', () => handleDelete(btn.dataset.id)));
+}
+
+async function quickAdjust(id, delta) {
+  const products = await Store.getProducts();
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  const next = Math.max(0, (Number(p.quantity) || 0) + delta);
+  await Store.updateProduct(id, { quantity: next });
+  await renderAll();
+  const card = document.querySelector(`.item-card[data-id="${id}"]`);
+  if (card) {
+    card.classList.add('flash');
+    setTimeout(() => card.classList.remove('flash'), 400);
+  }
+}
+
+['search-input', 'filter-status', 'sort-select'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderAll);
+  document.getElementById(id).addEventListener('change', renderAll);
+});
+
+function closePanels() {
+  document.getElementById('item-panel').classList.remove('open');
+  document.getElementById('settings-panel').classList.remove('open');
+  document.getElementById('panel-error').textContent = '';
+  editingId = null;
+}
+
+document.getElementById('add-btn').addEventListener('click', () => {
+  document.getElementById('settings-panel').classList.remove('open');
+  editingId = null;
+  document.getElementById('panel-title').textContent = 'Add item';
+  document.getElementById('item-id').value = '';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-qty').value = '';
+  document.getElementById('panel-error').textContent = '';
+  document.getElementById('item-panel').classList.add('open');
+  document.getElementById('f-name').focus();
+});
+
+async function openEdit(id) {
+  const products = await Store.getProducts();
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('settings-panel').classList.remove('open');
+  editingId = id;
+  document.getElementById('panel-title').textContent = 'Edit item';
+  document.getElementById('item-id').value = p.id;
+  document.getElementById('f-name').value = p.name || '';
+  document.getElementById('f-qty').value = p.quantity ?? '';
+  document.getElementById('panel-error').textContent = '';
+  document.getElementById('item-panel').classList.add('open');
+  document.getElementById('f-name').focus();
+}
+
+document.getElementById('cancel-item-btn').addEventListener('click', closePanels);
+
+document.getElementById('save-item-btn').addEventListener('click', async () => {
+  const name = document.getElementById('f-name').value.trim();
+  const qtyRaw = document.getElementById('f-qty').value;
+  const err = document.getElementById('panel-error');
+  err.textContent = '';
+
+  if (!name) { err.textContent = 'Item name is required.'; return; }
+  if (qtyRaw === '' || Number(qtyRaw) < 0) { err.textContent = 'Enter a valid quantity (0 or more).'; return; }
+
+  const payload = { name, quantity: Number(qtyRaw) };
+  if (editingId) {
+    await Store.updateProduct(editingId, payload);
+  } else {
+    await Store.addProduct(payload);
+  }
+  closePanels();
+  await renderAll();
+});
+
+async function handleDelete(id) {
+  const products = await Store.getProducts();
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`Remove "${p.name}" from the list?`)) return;
+  await Store.deleteProduct(id);
+  await renderAll();
+}
+
+document.getElementById('settings-btn').addEventListener('click', async () => {
+  document.getElementById('item-panel').classList.remove('open');
+  const cfg = await Store.getConfig();
+  document.getElementById('s-username').value = cfg.manager.username;
+  document.getElementById('s-password').value = '';
+  document.getElementById('s-viewcode').value = cfg.viewerCode || '';
+  document.getElementById('settings-error').textContent = '';
+  document.getElementById('settings-panel').classList.add('open');
+});
+document.getElementById('cancel-settings-btn').addEventListener('click', closePanels);
+
+document.getElementById('save-settings-btn').addEventListener('click', async () => {
+  const username = document.getElementById('s-username').value.trim();
+  const password = document.getElementById('s-password').value;
+  const viewcode = document.getElementById('s-viewcode').value.trim();
+  const err = document.getElementById('settings-error');
+  err.textContent = '';
+
+  if (!username || !viewcode) { err.textContent = 'Username and viewer code cannot be empty.'; return; }
+
+  const cfg = await Store.getConfig();
+  const newCfg = {
+    manager: { username, password: password ? password : cfg.manager.password },
+    viewerCode: viewcode,
+  };
+  await Store.setConfig(newCfg);
+  closePanels();
+  await renderAll();
+});
+
+boot();
+
+/* =========================================================================
+   NOTES FOR THE SUPABASE MOVE
+   -------------------------------------------------------------------------
+   1. Items table: create an "items" table (name, quantity, updated_at).
+      Swap every Store.* function in store.js to call
+      supabase.from('items')... instead of localStorage.
+
+   2. Inputer auth: replace the Setup/login screens' localStorage check
+      with real Supabase Auth (supabase.auth.signUp / signInWithPassword).
+      This page (manager.html) is the only place that should ever expose
+      a sign-up/sign-in form — keep it off the viewer page entirely.
+
+   3. Lock this page down further: it's already excluded from search
+      indexing (see the <meta name="robots"> tag above) and isn't linked
+      from index.html, but that's just obscurity. The real protection is
+      an RLS policy on "items" that only allows insert/update/delete when
+      auth.uid() matches your account — add that before going live.
+   ========================================================================= */
+</script>
+</body>
+</html>
