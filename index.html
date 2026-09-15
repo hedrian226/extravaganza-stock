@@ -164,6 +164,7 @@ document.getElementById('vg-submit').addEventListener('click', async () => {
 
 document.getElementById('signout-btn').addEventListener('click', () => {
   clearSession();
+  stopAutoRefresh();
   document.getElementById('vg-code').value = '';
   showScreen('screen-gate');
 });
@@ -171,7 +172,47 @@ document.getElementById('signout-btn').addEventListener('click', () => {
 async function enterApp() {
   showScreen('screen-app');
   await renderAll();
+  startAutoRefresh();
 }
+
+/* ---- background auto-refresh, so viewers never need to hit reload ---- */
+let refreshTimer = null;
+const AUTO_REFRESH_MS = 15000;
+
+function productsChanged(next) {
+  if (next.length !== viewerProducts.length) return true;
+  const key = p => `${p.id}:${p.quantity}:${p.name}`;
+  const a = viewerProducts.map(key).sort().join('|');
+  const b = next.map(key).sort().join('|');
+  return a !== b;
+}
+
+async function pollForUpdates() {
+  if (!session?.code || document.hidden) return;
+  try {
+    const result = await Store.getViewerProducts(session.code);
+    if (result.ok && productsChanged(result.products)) {
+      viewerProducts = result.products;
+      renderStats(viewerProducts);
+      renderGrid(viewerProducts);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshTimer = setInterval(pollForUpdates, AUTO_REFRESH_MS);
+}
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+// catch up immediately when the tab comes back into focus
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) pollForUpdates();
+});
 
 async function renderAll() {
   if (session?.code) {
