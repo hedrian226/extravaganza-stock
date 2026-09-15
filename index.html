@@ -69,6 +69,30 @@
       <div class="stat bad"><div class="stat-num" id="stat-out">0</div><div class="stat-label">No stock</div></div>
     </div>
 
+    <!-- ========================= QUICK PURCHASE LIST ========================= -->
+    <section class="purchase-panel" id="purchase-panel" aria-labelledby="purchase-title">
+      <div class="purchase-head">
+        <div>
+          <div class="purchase-kicker">SHOPPING LIST</div>
+          <h2 class="purchase-title" id="purchase-title">What to buy</h2>
+          <p class="purchase-sub" id="purchase-sub">Items with zero stock are listed here.</p>
+        </div>
+        <div class="purchase-count" id="purchase-count">0 items</div>
+      </div>
+
+      <div class="purchase-list" id="purchase-list"></div>
+
+      <div class="purchase-low" id="purchase-low" style="display:none;">
+        <div class="purchase-low-title">Low stock — consider buying soon</div>
+        <div class="purchase-low-list" id="purchase-low-list"></div>
+      </div>
+
+      <div class="purchase-actions">
+        <button class="btn primary" id="copy-buy-list" type="button">Copy buy list</button>
+        <button class="btn ghost" id="show-stock-list" type="button">View all stock</button>
+      </div>
+    </section>
+
     <div class="controls">
       <input type="text" id="search-input" placeholder="Search item" />
       <select id="filter-status">
@@ -260,6 +284,7 @@ async function pollForUpdates() {
       viewerProducts = result.products;
       lowStockThreshold = result.lowStockThreshold;
       renderStats(viewerProducts);
+      renderPurchaseList(viewerProducts);
       renderGrid(viewerProducts);
     }
   } catch (e) {
@@ -293,6 +318,7 @@ async function renderAll() {
     }
   }
   renderStats(viewerProducts);
+  renderPurchaseList(viewerProducts);
   renderGrid(viewerProducts);
 }
 
@@ -308,6 +334,80 @@ function renderStats(products) {
   document.getElementById('stat-low').textContent = lowCount;
   document.getElementById('stat-out').textContent = outCount;
 }
+
+function renderPurchaseList(products) {
+  const panel = document.getElementById('purchase-panel');
+  const listEl = document.getElementById('purchase-list');
+  const countEl = document.getElementById('purchase-count');
+  const subEl = document.getElementById('purchase-sub');
+  const lowWrap = document.getElementById('purchase-low');
+  const lowListEl = document.getElementById('purchase-low-list');
+  const copyBtn = document.getElementById('copy-buy-list');
+
+  const outItems = products
+    .filter(p => (Number(p.quantity) || 0) <= 0)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  const lowItems = products
+    .filter(p => {
+      const qty = Number(p.quantity) || 0;
+      return qty > 0 && qty <= lowStockThreshold;
+    })
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  countEl.textContent = `${outItems.length} ${outItems.length === 1 ? 'item' : 'items'}`;
+  subEl.textContent = outItems.length
+    ? 'These items are completely out of stock and should be bought.'
+    : 'Nothing needs to be bought right now.';
+
+  listEl.innerHTML = outItems.length
+    ? outItems.map((p, i) => `
+        <div class="purchase-item">
+          <span class="purchase-index">${i + 1}</span>
+          <span class="purchase-name">${escapeHtml(p.name)}</span>
+          <span class="purchase-qty">0</span>
+        </div>
+      `).join('')
+    : '<div class="purchase-empty"><span>✓</span> All items currently have stock.</div>';
+
+  if (lowItems.length) {
+    lowWrap.style.display = 'block';
+    lowListEl.innerHTML = lowItems.map(p => `
+      <span class="purchase-low-item">${escapeHtml(p.name)} <strong>${Number(p.quantity) || 0}</strong></span>
+    `).join('');
+  } else {
+    lowWrap.style.display = 'none';
+    lowListEl.innerHTML = '';
+  }
+
+  copyBtn.disabled = outItems.length === 0;
+  copyBtn.dataset.items = JSON.stringify(outItems.map(p => p.name || ''));
+  panel.classList.toggle('has-items', outItems.length > 0);
+}
+
+async function copyBuyList() {
+  const button = document.getElementById('copy-buy-list');
+  const names = JSON.parse(button.dataset.items || '[]');
+  if (!names.length) return;
+
+  const text = `EXTRAVAGANZA BEAUTÉ — ITEMS TO BUY\n\n${names.map((name, i) => `${i + 1}. ${name}`).join('\n')}`;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    const original = button.textContent;
+    button.textContent = 'Copied ✓';
+    setTimeout(() => { button.textContent = original; }, 1600);
+  } catch (e) {
+    console.error(e);
+    button.textContent = 'Copy unavailable';
+    setTimeout(() => { button.textContent = 'Copy buy list'; }, 1600);
+  }
+}
+
+document.getElementById('copy-buy-list').addEventListener('click', copyBuyList);
+document.getElementById('show-stock-list').addEventListener('click', () => {
+  document.getElementById('grid-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 function getFilteredSorted(products) {
   const q = document.getElementById('search-input').value.trim().toLowerCase();

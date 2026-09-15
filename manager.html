@@ -206,6 +206,8 @@ document.getElementById('ml-submit').addEventListener('click', async () => {
 
 /* ---- sign out ---- */
 document.getElementById('signout-btn').addEventListener('click', async () => {
+  Object.values(pendingWrites).forEach(clearTimeout);
+  Object.keys(pendingWrites).forEach(id => delete pendingWrites[id]);
   try {
     await Store.signOut();
   } catch (e) {
@@ -339,7 +341,7 @@ function updateCardDOM(id, qty) {
 function quickAdjust(id, delta) {
   const p = currentProducts.find(x => String(x.id) === String(id));
   if (!p) return;
-  const next = Math.max(0, (Number(p.quantity) || 0) + delta);
+  const next = Math.max(0, Math.round((Number(p.quantity) || 0) + delta));
   p.quantity = next; // update local state instantly, no network wait
 
   updateCardDOM(id, next);
@@ -363,10 +365,9 @@ function quickAdjust(id, delta) {
   }, 350);
 }
 
-['search-input', 'filter-status', 'sort-select'].forEach(id => {
-  document.getElementById(id).addEventListener('input', renderAll);
-  document.getElementById(id).addEventListener('change', renderAll);
-});
+document.getElementById('search-input').addEventListener('input', () => renderGrid(currentProducts));
+document.getElementById('filter-status').addEventListener('change', () => renderGrid(currentProducts));
+document.getElementById('sort-select').addEventListener('change', () => renderGrid(currentProducts));
 
 function closePanels() {
   document.getElementById('item-panel').classList.remove('open');
@@ -416,7 +417,7 @@ document.getElementById('save-item-btn').addEventListener('click', async () => {
   err.textContent = '';
 
   if (!name) { err.textContent = 'Item name is required.'; return; }
-  if (qtyRaw === '' || Number(qtyRaw) < 0) { err.textContent = 'Enter a valid quantity (0 or more).'; return; }
+  if (qtyRaw === '' || !Number.isInteger(Number(qtyRaw)) || Number(qtyRaw) < 0) { err.textContent = 'Enter a whole quantity (0 or more).'; return; }
 
   try {
     const payload = { name, quantity: Number(qtyRaw) };

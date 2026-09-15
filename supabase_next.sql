@@ -143,5 +143,5 @@ as $$
   from stock;
 $$;
 
-revoke execute on function public.get_viewer_data(text) from public, authenticated;
-grant execute on function public.get_viewer_data(text) to anon;
+revoke execute on function public.get_viewer_data(text) from public;
+grant execute on function public.get_viewer_data(text) to anon, authenticated;
