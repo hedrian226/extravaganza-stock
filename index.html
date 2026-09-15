@@ -82,21 +82,24 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="store.js"></script>
 <script>
 const SS_SESSION = 'exb_viewer_session';
 let session = null;
+let viewerProducts = [];
 
 function loadSession() {
   const raw = sessionStorage.getItem(SS_SESSION);
   session = raw ? JSON.parse(raw) : null;
 }
-function setSession() {
-  session = { signedIn: true };
+function setSession(code) {
+  session = { signedIn: true, code };
   sessionStorage.setItem(SS_SESSION, JSON.stringify(session));
 }
 function clearSession() {
   session = null;
+  viewerProducts = [];
   sessionStorage.removeItem(SS_SESSION);
 }
 
@@ -107,17 +110,22 @@ function showScreen(id) {
 
 async function boot() {
   loadSession();
-  const cfg = await Store.getConfig();
 
-  if (!cfg || !cfg.viewerCode) {
-    showScreen('screen-notready');
-    return;
+  if (session && session.signedIn && session.code) {
+    try {
+      const result = await Store.getViewerProducts(session.code);
+      if (result.ok) {
+        viewerProducts = result.products;
+        await enterApp();
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    clearSession();
   }
-  if (session && session.signedIn) {
-    await enterApp();
-  } else {
-    showScreen('screen-gate');
-  }
+
+  showScreen('screen-gate');
 }
 
 document.getElementById('vg-submit').addEventListener('click', async () => {
@@ -125,12 +133,31 @@ document.getElementById('vg-submit').addEventListener('click', async () => {
   const err = document.getElementById('vg-error');
   err.textContent = '';
 
-  const cfg = await Store.getConfig();
-  if (cfg && cfg.viewerCode && cfg.viewerCode === code) {
-    setSession();
+  if (!code) {
+    err.textContent = 'Enter the access code.';
+    return;
+  }
+
+  const button = document.getElementById('vg-submit');
+  button.disabled = true;
+  button.textContent = 'Checking…';
+
+  try {
+    const result = await Store.getViewerProducts(code);
+    if (!result.ok) {
+      err.textContent = 'Incorrect access code.';
+      return;
+    }
+
+    viewerProducts = result.products;
+    setSession(code);
     await enterApp();
-  } else {
-    err.textContent = 'Incorrect access code.';
+  } catch (e) {
+    console.error(e);
+    err.textContent = 'Could not connect to the stock database. Please try again.';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'View stock';
   }
 });
 
@@ -146,9 +173,16 @@ async function enterApp() {
 }
 
 async function renderAll() {
-  const products = await Store.getProducts();
-  renderStats(products);
-  renderGrid(products);
+  if (session?.code) {
+    try {
+      const result = await Store.getViewerProducts(session.code);
+      if (result.ok) viewerProducts = result.products;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  renderStats(viewerProducts);
+  renderGrid(viewerProducts);
 }
 
 function renderStats(products) {
@@ -210,8 +244,8 @@ function renderGrid(products) {
 }
 
 ['search-input', 'filter-status', 'sort-select'].forEach(id => {
-  document.getElementById(id).addEventListener('input', renderAll);
-  document.getElementById(id).addEventListener('change', renderAll);
+  document.getElementById(id).addEventListener('input', () => renderGrid(viewerProducts));
+  document.getElementById(id).addEventListener('change', () => renderGrid(viewerProducts));
 });
 
 boot();

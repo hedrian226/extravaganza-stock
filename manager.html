@@ -13,17 +13,17 @@
 <body>
 
 <!-- ========================= SETUP (first run only) ========================= -->
-<div class="screen active" id="screen-setup">
+<div class="screen" id="screen-setup">
   <div class="auth-wrap">
     <div class="auth-card">
       <span class="wordmark">Extravaganza<span> Beauté</span></span>
       <div class="auth-sub">MANAGE STOCK</div>
-      <h1 class="auth-title">Set up your account</h1>
-      <p class="auth-hint">First time here. Create the login you'll use to add and update stock, and an access code to share with whoever checks it.</p>
+      <h1 class="auth-title">Supabase account</h1>
+      <p class="auth-hint">Your manager account is already created in Supabase. Use the sign-in screen to access the stock manager.</p>
 
       <div class="field">
-        <label for="su-username">Username</label>
-        <input type="text" id="su-username" autocomplete="off" placeholder="e.g. your name" />
+        <label for="su-username">Email</label>
+        <input type="email" id="su-username" autocomplete="email" placeholder="you@example.com" />
       </div>
       <div class="field">
         <label for="su-password">Password</label>
@@ -35,7 +35,7 @@
       </div>
       <div class="error-msg" id="su-error"></div>
       <button class="btn primary full" id="su-submit">Create account</button>
-      <p class="auth-footnote">Stored only in this browser for now. Connect Supabase to make this a real account.</p>
+      <p class="auth-footnote">Supabase handles the manager account and database securely.</p>
     </div>
   </div>
 </div>
@@ -47,10 +47,10 @@
       <span class="wordmark">Extravaganza<span> Beauté</span></span>
       <div class="auth-sub">MANAGE STOCK</div>
       <h1 class="auth-title">Sign in</h1>
-      <p class="auth-hint">Enter your username and password to add or update stock.</p>
+      <p class="auth-hint">Sign in with the email and password you created in Supabase.</p>
       <div class="field">
-        <label for="ml-username">Username</label>
-        <input type="text" id="ml-username" autocomplete="username" />
+        <label for="ml-username">Email</label>
+        <input type="email" id="ml-username" autocomplete="email" />
       </div>
       <div class="field">
         <label for="ml-password">Password</label>
@@ -114,10 +114,10 @@
     <div class="panel" id="settings-panel">
       <h3 class="panel-title">Settings</h3>
       <div class="panel-grid">
-        <div class="field"><label for="s-username">Username</label><input type="text" id="s-username" /></div>
-        <div class="field"><label for="s-password">Password</label><input type="password" id="s-password" placeholder="Leave blank to keep current" /></div>
+        <div class="field"><label for="s-username">Account email</label><input type="email" id="s-username" readonly /></div>
+        <div class="field"><label for="s-password">New password</label><input type="password" id="s-password" placeholder="Leave blank to keep current" /></div>
       </div>
-      <div class="field"><label for="s-viewcode">Viewer access code</label><input type="text" id="s-viewcode" /></div>
+      <div class="field"><label for="s-viewcode">New viewer access code</label><input type="text" id="s-viewcode" placeholder="Leave blank to keep current" /></div>
       <div class="error-msg" id="settings-error"></div>
       <div class="panel-actions">
         <button class="btn primary" id="save-settings-btn">Save settings</button>
@@ -133,28 +133,14 @@
       </div>
     </div>
 
-    <p class="footnote">Data in this preview is stored in this browser only, so it won't sync across devices yet. Connect Supabase to make it live everywhere.</p>
+    <p class="footnote">Stock is stored in Supabase and syncs across your devices. Set or change the viewer access code in Settings.</p>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="store.js"></script>
 <script>
-const SS_SESSION = 'exb_manager_session';
-let session = null;
 let editingId = null;
-
-function loadSession() {
-  const raw = sessionStorage.getItem(SS_SESSION);
-  session = raw ? JSON.parse(raw) : null;
-}
-function setSession() {
-  session = { signedIn: true };
-  sessionStorage.setItem(SS_SESSION, JSON.stringify(session));
-}
-function clearSession() {
-  session = null;
-  sessionStorage.removeItem(SS_SESSION);
-}
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -162,61 +148,54 @@ function showScreen(id) {
 }
 
 async function boot() {
-  loadSession();
-  const cfg = await Store.getConfig();
-
-  if (!cfg || !cfg.manager || !cfg.manager.username) {
-    showScreen('screen-setup');
-    return;
-  }
-  if (session && session.signedIn) {
-    await enterApp();
-  } else {
+  try {
+    const user = await Store.getCurrentUser();
+    if (user) {
+      await enterApp();
+    } else {
+      showScreen('screen-login');
+    }
+  } catch (e) {
+    console.error(e);
     showScreen('screen-login');
   }
 }
 
-/* ---- setup ---- */
-document.getElementById('su-submit').addEventListener('click', async () => {
-  const username = document.getElementById('su-username').value.trim();
-  const password = document.getElementById('su-password').value;
-  const viewcode = document.getElementById('su-viewcode').value.trim();
-  const err = document.getElementById('su-error');
-  err.textContent = '';
-
-  if (!username || !password || !viewcode) {
-    err.textContent = 'Please fill in all three fields.';
-    return;
-  }
-  if (password.length < 6) {
-    err.textContent = 'Password should be at least 6 characters.';
-    return;
-  }
-
-  await Store.setConfig({ manager: { username, password }, viewerCode: viewcode });
-  setSession();
-  await enterApp();
-});
-
 /* ---- login ---- */
 document.getElementById('ml-submit').addEventListener('click', async () => {
-  const username = document.getElementById('ml-username').value.trim();
+  const email = document.getElementById('ml-username').value.trim();
   const password = document.getElementById('ml-password').value;
   const err = document.getElementById('ml-error');
+  const button = document.getElementById('ml-submit');
   err.textContent = '';
 
-  const cfg = await Store.getConfig();
-  if (cfg && cfg.manager && cfg.manager.username === username && cfg.manager.password === password) {
-    setSession();
+  if (!email || !password) {
+    err.textContent = 'Enter your email and password.';
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = 'Signing in…';
+
+  try {
+    await Store.signIn(email, password);
     await enterApp();
-  } else {
-    err.textContent = 'Incorrect username or password.';
+  } catch (e) {
+    console.error(e);
+    err.textContent = 'Incorrect email or password.';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Sign in';
   }
 });
 
 /* ---- sign out ---- */
-document.getElementById('signout-btn').addEventListener('click', () => {
-  clearSession();
+document.getElementById('signout-btn').addEventListener('click', async () => {
+  try {
+    await Store.signOut();
+  } catch (e) {
+    console.error(e);
+  }
   closePanels();
   document.getElementById('ml-username').value = '';
   document.getElementById('ml-password').value = '';
@@ -230,9 +209,16 @@ async function enterApp() {
 }
 
 async function renderAll() {
-  const products = await Store.getProducts();
-  renderStats(products);
-  renderGrid(products);
+  try {
+    const products = await Store.getProducts();
+    renderStats(products);
+    renderGrid(products);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('empty-title').textContent = 'Could not load stock';
+    document.getElementById('empty-sub').textContent = e.message || 'Please refresh and try again.';
+    document.getElementById('empty-state').style.display = 'block';
+  }
 }
 
 function renderStats(products) {
@@ -307,16 +293,20 @@ function renderGrid(products) {
 }
 
 async function quickAdjust(id, delta) {
-  const products = await Store.getProducts();
-  const p = products.find(x => x.id === id);
-  if (!p) return;
-  const next = Math.max(0, (Number(p.quantity) || 0) + delta);
-  await Store.updateProduct(id, { quantity: next });
-  await renderAll();
-  const card = document.querySelector(`.item-card[data-id="${id}"]`);
-  if (card) {
-    card.classList.add('flash');
-    setTimeout(() => card.classList.remove('flash'), 400);
+  try {
+    const products = await Store.getProducts();
+    const p = products.find(x => String(x.id) === String(id));
+    if (!p) return;
+    const next = Math.max(0, (Number(p.quantity) || 0) + delta);
+    await Store.updateProduct(id, { quantity: next });
+    await renderAll();
+    const card = document.querySelector(`.item-card[data-id="${id}"]`);
+    if (card) {
+      card.classList.add('flash');
+      setTimeout(() => card.classList.remove('flash'), 400);
+    }
+  } catch (e) {
+    alert(e.message || 'Could not update quantity.');
   }
 }
 
@@ -329,6 +319,7 @@ function closePanels() {
   document.getElementById('item-panel').classList.remove('open');
   document.getElementById('settings-panel').classList.remove('open');
   document.getElementById('panel-error').textContent = '';
+  document.getElementById('settings-error').textContent = '';
   editingId = null;
 }
 
@@ -345,18 +336,22 @@ document.getElementById('add-btn').addEventListener('click', () => {
 });
 
 async function openEdit(id) {
-  const products = await Store.getProducts();
-  const p = products.find(x => x.id === id);
-  if (!p) return;
-  document.getElementById('settings-panel').classList.remove('open');
-  editingId = id;
-  document.getElementById('panel-title').textContent = 'Edit item';
-  document.getElementById('item-id').value = p.id;
-  document.getElementById('f-name').value = p.name || '';
-  document.getElementById('f-qty').value = p.quantity ?? '';
-  document.getElementById('panel-error').textContent = '';
-  document.getElementById('item-panel').classList.add('open');
-  document.getElementById('f-name').focus();
+  try {
+    const products = await Store.getProducts();
+    const p = products.find(x => String(x.id) === String(id));
+    if (!p) return;
+    document.getElementById('settings-panel').classList.remove('open');
+    editingId = id;
+    document.getElementById('panel-title').textContent = 'Edit item';
+    document.getElementById('item-id').value = p.id;
+    document.getElementById('f-name').value = p.name || '';
+    document.getElementById('f-qty').value = p.quantity ?? '';
+    document.getElementById('panel-error').textContent = '';
+    document.getElementById('item-panel').classList.add('open');
+    document.getElementById('f-name').focus();
+  } catch (e) {
+    alert(e.message || 'Could not load item.');
+  }
 }
 
 document.getElementById('cancel-item-btn').addEventListener('click', closePanels);
@@ -370,75 +365,72 @@ document.getElementById('save-item-btn').addEventListener('click', async () => {
   if (!name) { err.textContent = 'Item name is required.'; return; }
   if (qtyRaw === '' || Number(qtyRaw) < 0) { err.textContent = 'Enter a valid quantity (0 or more).'; return; }
 
-  const payload = { name, quantity: Number(qtyRaw) };
-  if (editingId) {
-    await Store.updateProduct(editingId, payload);
-  } else {
-    await Store.addProduct(payload);
+  try {
+    const payload = { name, quantity: Number(qtyRaw) };
+    if (editingId) await Store.updateProduct(editingId, payload);
+    else await Store.addProduct(payload);
+    closePanels();
+    await renderAll();
+  } catch (e) {
+    err.textContent = e.message || 'Could not save item.';
   }
-  closePanels();
-  await renderAll();
 });
 
 async function handleDelete(id) {
-  const products = await Store.getProducts();
-  const p = products.find(x => x.id === id);
-  if (!p) return;
-  if (!confirm(`Remove "${p.name}" from the list?`)) return;
-  await Store.deleteProduct(id);
-  await renderAll();
+  try {
+    const products = await Store.getProducts();
+    const p = products.find(x => String(x.id) === String(id));
+    if (!p) return;
+    if (!confirm(`Remove "${p.name}" from the list?`)) return;
+    await Store.deleteProduct(id);
+    await renderAll();
+  } catch (e) {
+    alert(e.message || 'Could not delete item.');
+  }
 }
 
 document.getElementById('settings-btn').addEventListener('click', async () => {
   document.getElementById('item-panel').classList.remove('open');
-  const cfg = await Store.getConfig();
-  document.getElementById('s-username').value = cfg.manager.username;
+  const user = await Store.getCurrentUser();
+  document.getElementById('s-username').value = user?.email || '';
   document.getElementById('s-password').value = '';
-  document.getElementById('s-viewcode').value = cfg.viewerCode || '';
+  document.getElementById('s-viewcode').value = '';
   document.getElementById('settings-error').textContent = '';
   document.getElementById('settings-panel').classList.add('open');
 });
+
 document.getElementById('cancel-settings-btn').addEventListener('click', closePanels);
 
 document.getElementById('save-settings-btn').addEventListener('click', async () => {
-  const username = document.getElementById('s-username').value.trim();
   const password = document.getElementById('s-password').value;
   const viewcode = document.getElementById('s-viewcode').value.trim();
   const err = document.getElementById('settings-error');
   err.textContent = '';
 
-  if (!username || !viewcode) { err.textContent = 'Username and viewer code cannot be empty.'; return; }
+  if (!password && !viewcode) {
+    closePanels();
+    return;
+  }
+  if (password && password.length < 6) {
+    err.textContent = 'New password should be at least 6 characters.';
+    return;
+  }
+  if (viewcode && viewcode.length < 6) {
+    err.textContent = 'Viewer access code should be at least 6 characters.';
+    return;
+  }
 
-  const cfg = await Store.getConfig();
-  const newCfg = {
-    manager: { username, password: password ? password : cfg.manager.password },
-    viewerCode: viewcode,
-  };
-  await Store.setConfig(newCfg);
-  closePanels();
-  await renderAll();
+  try {
+    if (password) await Store.updatePassword(password);
+    if (viewcode) await Store.setViewerCode(viewcode);
+    closePanels();
+  } catch (e) {
+    console.error(e);
+    err.textContent = e.message || 'Could not save settings.';
+  }
 });
 
 boot();
-
-/* =========================================================================
-   NOTES FOR THE SUPABASE MOVE
-   -------------------------------------------------------------------------
-   1. Items table: create an "items" table (name, quantity, updated_at).
-      Swap every Store.* function in store.js to call
-      supabase.from('items')... instead of localStorage.
-
-   2. Inputer auth: replace the Setup/login screens' localStorage check
-      with real Supabase Auth (supabase.auth.signUp / signInWithPassword).
-      This page (manager.html) is the only place that should ever expose
-      a sign-up/sign-in form — keep it off the viewer page entirely.
-
-   3. Lock this page down further: it's already excluded from search
-      indexing (see the <meta name="robots"> tag above) and isn't linked
-      from index.html, but that's just obscurity. The real protection is
-      an RLS policy on "items" that only allows insert/update/delete when
-      auth.uid() matches your account — add that before going live.
-   ========================================================================= */
 </script>
 </body>
 </html>
