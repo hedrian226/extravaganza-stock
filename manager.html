@@ -16,7 +16,7 @@
 <meta name="apple-mobile-web-app-title" content="EB Manage">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -106,23 +106,6 @@
       <button class="btn primary" id="add-btn">Add item</button>
     </div>
 
-    <!-- purchase alert -->
-    <section class="manager-purchase" id="manager-purchase" aria-live="polite">
-      <div class="manager-purchase-head">
-        <div>
-          <div class="manager-purchase-kicker">PURCHASE ALERT</div>
-          <h2>Needs to be bought</h2>
-          <p id="purchase-summary">Checking stock…</p>
-        </div>
-        <div class="manager-purchase-badge" id="purchase-count">0</div>
-      </div>
-      <div class="manager-purchase-list" id="purchase-alert-list"></div>
-      <div class="manager-purchase-actions">
-        <button class="btn primary" id="copy-manager-buy-list" type="button">Copy buy list</button>
-        <button class="btn ghost" id="refresh-purchase-btn" type="button">Refresh stock</button>
-      </div>
-    </section>
-
     <!-- add / edit panel -->
     <div class="panel" id="item-panel">
       <h3 class="panel-title" id="panel-title">Add item</h3>
@@ -154,35 +137,6 @@
       </div>
     </div>
 
-    <section class="manager-tools" aria-label="Stock tools">
-      <div class="manager-tool-card">
-        <div class="manager-tool-icon">↩</div>
-        <div><strong>Undo last change</strong><span>Reverse your most recent quantity change.</span></div>
-        <button class="btn ghost small" id="undo-btn" type="button" disabled>Undo</button>
-      </div>
-      <div class="manager-tool-card">
-        <div class="manager-tool-icon">⇩</div>
-        <div><strong>Import Excel / CSV</strong><span>Columns: Name and Quantity.</span></div>
-        <input type="file" id="import-file" accept=".xlsx,.xls,.csv" hidden />
-        <button class="btn ghost small" id="import-btn" type="button">Import</button>
-      </div>
-      <div class="manager-tool-card">
-        <div class="manager-tool-icon">⇧</div>
-        <div><strong>Export stock</strong><span>Download the current inventory as CSV.</span></div>
-        <button class="btn ghost small" id="export-btn" type="button">Export</button>
-      </div>
-      <div class="manager-tool-card">
-        <div class="manager-tool-icon">☷</div>
-        <div><strong>Activity log</strong><span>See recent changes made by this account.</span></div>
-        <button class="btn ghost small" id="activity-btn" type="button">View log</button>
-      </div>
-    </section>
-
-    <div class="panel" id="activity-panel">
-      <div class="panel-head-row"><h3 class="panel-title">Activity log</h3><button class="icon-btn" id="close-activity-btn" type="button" aria-label="Close activity log">✕</button></div>
-      <div id="activity-list" class="activity-list"><div class="activity-empty">Loading activity…</div></div>
-    </div>
-
     <div id="grid-wrap">
       <div class="stock-grid" id="stock-grid"></div>
       <div class="empty-state" id="empty-state" style="display:none;">
@@ -196,14 +150,12 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="store.js"></script>
 <script src="ui.js"></script>
 <script src="effects.js"></script>
 <script>
 let editingId = null;
 let lowStockThreshold = 5;
-let lastUndo = null;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -242,7 +194,6 @@ document.getElementById('ml-submit').addEventListener('click', async () => {
 
   try {
     await Store.signIn(email, password);
-    await Store.logActivity('login', null, null, 'Manager signed in').catch(console.error);
     await enterApp();
   } catch (e) {
     console.error(e);
@@ -289,7 +240,6 @@ async function renderAll() {
     currentProducts = products;
     renderStats(products);
     renderGrid(products);
-    renderPurchaseAlert(products);
   } catch (e) {
     console.error(e);
     document.getElementById('empty-title').textContent = 'Could not load stock';
@@ -391,15 +341,11 @@ function updateCardDOM(id, qty) {
 function quickAdjust(id, delta) {
   const p = currentProducts.find(x => String(x.id) === String(id));
   if (!p) return;
-  const oldQty = Number(p.quantity) || 0;
-  const next = Math.max(0, Math.round(oldQty + delta));
-  if (next === oldQty) return;
+  const next = Math.max(0, Math.round((Number(p.quantity) || 0) + delta));
   p.quantity = next; // update local state instantly, no network wait
-  setUndo(id, oldQty, next, p.name);
 
   updateCardDOM(id, next);
   renderStats(currentProducts);
-  renderPurchaseAlert(currentProducts);
 
   const card = document.querySelector(`.item-card[data-id="${id}"]`);
   if (card) {
@@ -412,7 +358,6 @@ function quickAdjust(id, delta) {
   pendingWrites[id] = setTimeout(async () => {
     try {
       await Store.updateProduct(id, { quantity: next });
-      await Store.logActivity('adjust_quantity', id, p.name, `Quantity ${oldQty} → ${next}`);
     } catch (e) {
       await UI.alert(e.message || 'Could not update quantity.', 'Update failed');
       await renderAll(); // re-sync with the server if the save failed
@@ -424,214 +369,9 @@ document.getElementById('search-input').addEventListener('input', () => renderGr
 document.getElementById('filter-status').addEventListener('change', () => renderGrid(currentProducts));
 document.getElementById('sort-select').addEventListener('change', () => renderGrid(currentProducts));
 
-/* ---- purchase / manager tools ---- */
-function getPurchaseItems(products) {
-  return products
-    .map(p => ({ ...p, quantity: Number(p.quantity) || 0 }))
-    .filter(p => p.quantity <= lowStockThreshold)
-    .sort((a, b) => {
-      const aOut = a.quantity <= 0 ? 0 : 1;
-      const bOut = b.quantity <= 0 ? 0 : 1;
-      return aOut - bOut || a.name.localeCompare(b.name);
-    });
-}
-
-function renderPurchaseAlert(products) {
-  const items = getPurchaseItems(products);
-  const out = items.filter(p => p.quantity <= 0);
-  const low = items.filter(p => p.quantity > 0);
-  const panel = document.getElementById('manager-purchase');
-  const list = document.getElementById('purchase-alert-list');
-  const count = document.getElementById('purchase-count');
-  const summary = document.getElementById('purchase-summary');
-  const button = document.getElementById('copy-manager-buy-list');
-
-  count.textContent = items.length;
-  panel.classList.toggle('has-items', items.length > 0);
-  button.disabled = items.length === 0;
-
-  if (!items.length) {
-    summary.textContent = 'Everything is currently above the low-stock threshold.';
-    list.innerHTML = '<div class="manager-purchase-empty">✓ No purchase is needed right now.</div>';
-    return;
-  }
-
-  list.innerHTML = items.map((p, i) => {
-    const isOut = p.quantity <= 0;
-    const label = isOut ? 'OUT OF STOCK' : `LOW STOCK · ${p.quantity} left`;
-    return `<div class="manager-purchase-row">
-      <span class="manager-purchase-index">${i + 1}</span>
-      <span class="manager-purchase-name">${escapeHtml(p.name)}</span>
-      <span class="manager-purchase-status ${isOut ? 'out' : 'low'}">${label}</span>
-    </div>`;
-  }).join('');
-  summary.textContent = `${out.length} out of stock${low.length ? ` · ${low.length} low stock` : ''}.`;
-}
-
-function buildPurchaseText() {
-  const items = getPurchaseItems(currentProducts);
-  const out = items.filter(p => p.quantity <= 0);
-  const low = items.filter(p => p.quantity > 0);
-  const lines = ['EXTRAVAGANZA BEAUTÉ', 'PURCHASE LIST', ''];
-  if (out.length) {
-    lines.push('OUT OF STOCK:');
-    out.forEach((p, i) => lines.push(`${i + 1}. ${p.name}`));
-    lines.push('');
-  }
-  if (low.length) {
-    lines.push('LOW STOCK:');
-    low.forEach((p, i) => lines.push(`${i + 1}. ${p.name} — ${p.quantity} left`));
-    lines.push('');
-  }
-  lines.push(`Total items to buy: ${items.length}`);
-  return lines.join('\n');
-}
-
-document.getElementById('copy-manager-buy-list').addEventListener('click', async () => {
-  const items = getPurchaseItems(currentProducts);
-  if (!items.length) return;
-  try {
-    await navigator.clipboard.writeText(buildPurchaseText());
-    await UI.alert('The purchase list was copied to your clipboard.', 'Buy list copied');
-  } catch (e) {
-    await UI.alert(buildPurchaseText(), 'Purchase list');
-  }
-});
-
-document.getElementById('refresh-purchase-btn').addEventListener('click', renderAll);
-
-function setUndo(id, oldQty, newQty, name) {
-  lastUndo = { id, oldQty, newQty, name, createdAt: Date.now() };
-  const btn = document.getElementById('undo-btn');
-  btn.disabled = false;
-  btn.textContent = `Undo ${name ? `“${name}”` : 'last change'}`;
-}
-
-function clearUndo() {
-  lastUndo = null;
-  const btn = document.getElementById('undo-btn');
-  btn.disabled = true;
-  btn.textContent = 'Undo';
-}
-
-document.getElementById('undo-btn').addEventListener('click', async () => {
-  if (!lastUndo) return;
-  const action = lastUndo;
-  try {
-    const pending = pendingWrites[action.id];
-    if (pending) { clearTimeout(pending); delete pendingWrites[action.id]; }
-    const p = currentProducts.find(x => String(x.id) === String(action.id));
-    if (!p) { clearUndo(); return; }
-    const fromQty = Number(p.quantity) || 0;
-    p.quantity = action.oldQty;
-    updateCardDOM(action.id, action.oldQty);
-    renderStats(currentProducts);
-    renderPurchaseAlert(currentProducts);
-    await Store.updateProduct(action.id, { quantity: action.oldQty });
-    await Store.logActivity('undo_quantity', action.id, action.name, `Quantity ${fromQty} → ${action.oldQty}`);
-    clearUndo();
-  } catch (e) {
-    await UI.alert(e.message || 'Could not undo the change.', 'Undo failed');
-    await renderAll();
-  }
-});
-
-async function loadActivity() {
-  const list = document.getElementById('activity-list');
-  try {
-    const rows = await Store.getActivityLog(40);
-    if (!rows.length) {
-      list.innerHTML = '<div class="activity-empty">No activity yet.</div>';
-      return;
-    }
-    list.innerHTML = rows.map(row => {
-      const when = new Date(row.createdAt);
-      const time = Number.isNaN(when.getTime()) ? '' : when.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-      return `<div class="activity-row">
-        <div class="activity-main"><strong>${escapeHtml(row.actionLabel)}</strong><span>${escapeHtml(row.details || '')}</span></div>
-        <time>${escapeHtml(time)}</time>
-      </div>`;
-    }).join('');
-  } catch (e) {
-    console.error(e);
-    list.innerHTML = '<div class="activity-empty">Activity log is not available yet. Run the latest SQL once in Supabase.</div>';
-  }
-}
-
-document.getElementById('activity-btn').addEventListener('click', async () => {
-  document.getElementById('item-panel').classList.remove('open');
-  document.getElementById('settings-panel').classList.remove('open');
-  document.getElementById('activity-panel').classList.add('open');
-  await loadActivity();
-});
-document.getElementById('close-activity-btn').addEventListener('click', closePanels);
-
-function csvEscape(value) {
-  const s = String(value ?? '');
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-document.getElementById('export-btn').addEventListener('click', () => {
-  const rows = [['Name', 'Quantity', 'Status', 'Last Updated']];
-  currentProducts.forEach(p => {
-    rows.push([p.name, Number(p.quantity) || 0, computeStatus(p, lowStockThreshold).label, p.updatedAt || '']);
-  });
-  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `extravaganza-stock-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-});
-
-document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-file').click());
-document.getElementById('import-file').addEventListener('change', async (event) => {
-  const file = event.target.files?.[0];
-  event.target.value = '';
-  if (!file) return;
-  try {
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    if (!rows.length) throw new Error('The file has no data rows.');
-    const normalized = rows.map(row => {
-      const keys = Object.keys(row);
-      const nameKey = keys.find(k => /^(name|item|product|item name|product name)$/i.test(String(k).trim()));
-      const qtyKey = keys.find(k => /^(quantity|qty|stock|amount)$/i.test(String(k).trim()));
-      return { name: String(nameKey ? row[nameKey] : '').trim(), quantity: qtyKey ? Number(row[qtyKey]) : NaN };
-    }).filter(r => r.name);
-    if (!normalized.length) throw new Error('Could not find a Name/Item column.');
-    const invalid = normalized.find(r => !Number.isInteger(r.quantity) || r.quantity < 0);
-    if (invalid) throw new Error(`Invalid quantity for “${invalid.name}”. Use whole numbers 0 or more.`);
-
-    const existing = new Map(currentProducts.map(p => [p.name.trim().toLowerCase(), p]));
-    let added = 0, updated = 0;
-    for (const row of normalized) {
-      const match = existing.get(row.name.toLowerCase());
-      if (match) {
-        await Store.updateProduct(match.id, { quantity: row.quantity });
-        updated++;
-      } else {
-        const created = await Store.addProduct({ name: row.name, quantity: row.quantity });
-        existing.set(row.name.toLowerCase(), created);
-        added++;
-      }
-    }
-    await Store.logActivity('import_stock', null, null, `Imported ${normalized.length} rows (${added} added, ${updated} updated)`);
-    await renderAll();
-    await UI.alert(`${added} added and ${updated} updated.`, 'Import complete');
-  } catch (e) {
-    console.error(e);
-    await UI.alert(e.message || 'Could not import the file.', 'Import failed');
-  }
-});
-
 function closePanels() {
   document.getElementById('item-panel').classList.remove('open');
   document.getElementById('settings-panel').classList.remove('open');
-  document.getElementById('activity-panel').classList.remove('open');
   document.getElementById('panel-error').textContent = '';
   document.getElementById('settings-error').textContent = '';
   editingId = null;
@@ -681,16 +421,8 @@ document.getElementById('save-item-btn').addEventListener('click', async () => {
 
   try {
     const payload = { name, quantity: Number(qtyRaw) };
-    const wasEditing = Boolean(editingId);
-    const before = wasEditing ? currentProducts.find(x => String(x.id) === String(editingId)) : null;
-    if (wasEditing) {
-      await Store.updateProduct(editingId, payload);
-      if (before && before.quantity !== payload.quantity) setUndo(editingId, before.quantity, payload.quantity, name);
-      await Store.logActivity('update_item', editingId, name, before ? `Updated item (${before.quantity} → ${payload.quantity})` : 'Updated item');
-    } else {
-      const created = await Store.addProduct(payload);
-      await Store.logActivity('add_item', created.id, name, `Added item with quantity ${payload.quantity}`);
-    }
+    if (editingId) await Store.updateProduct(editingId, payload);
+    else await Store.addProduct(payload);
     closePanels();
     await renderAll();
   } catch (e) {
@@ -711,7 +443,6 @@ async function handleDelete(id) {
     });
     if (!confirmed) return;
     await Store.deleteProduct(id);
-    await Store.logActivity('delete_item', id, p.name, `Deleted item (last quantity ${p.quantity})`);
     await renderAll();
   } catch (e) {
     await UI.alert(e.message || 'Could not delete item.', 'Delete failed');
@@ -765,11 +496,7 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
       lowStockThreshold = Number(lowstockRaw);
       renderStats(currentProducts);
       renderGrid(currentProducts);
-      renderPurchaseAlert(currentProducts);
-      await Store.logActivity('settings_change', null, null, `Low-stock threshold changed to ${lowStockThreshold}`);
     }
-    if (password) await Store.logActivity('settings_change', null, null, 'Manager password changed');
-    if (viewcode) await Store.logActivity('settings_change', null, null, 'Viewer access code changed');
     closePanels();
   } catch (e) {
     console.error(e);
