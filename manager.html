@@ -139,6 +139,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="store.js"></script>
+<script src="effects.js"></script>
 <script>
 let editingId = null;
 
@@ -203,6 +204,9 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 });
 
 /* ---- app ---- */
+let currentProducts = [];
+const pendingWrites = {}; // id -> timeout handle, so rapid clicks coalesce into one save
+
 async function enterApp() {
   showScreen('screen-app');
   await renderAll();
@@ -211,6 +215,7 @@ async function enterApp() {
 async function renderAll() {
   try {
     const products = await Store.getProducts();
+    currentProducts = products;
     renderStats(products);
     renderGrid(products);
   } catch (e) {
@@ -292,22 +297,44 @@ function renderGrid(products) {
   grid.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', () => handleDelete(btn.dataset.id)));
 }
 
-async function quickAdjust(id, delta) {
-  try {
-    const products = await Store.getProducts();
-    const p = products.find(x => String(x.id) === String(id));
-    if (!p) return;
-    const next = Math.max(0, (Number(p.quantity) || 0) + delta);
-    await Store.updateProduct(id, { quantity: next });
-    await renderAll();
-    const card = document.querySelector(`.item-card[data-id="${id}"]`);
-    if (card) {
-      card.classList.add('flash');
-      setTimeout(() => card.classList.remove('flash'), 400);
-    }
-  } catch (e) {
-    alert(e.message || 'Could not update quantity.');
+function updateCardDOM(id, qty) {
+  const card = document.querySelector(`.item-card[data-id="${id}"]`);
+  if (!card) return;
+  const numEl = card.querySelector('.qty-num');
+  if (numEl) numEl.textContent = qty;
+  const pill = card.querySelector('.status-pill');
+  if (pill) {
+    const status = computeStatus({ quantity: qty });
+    pill.className = `status-pill status-${status.key}`;
+    pill.innerHTML = `<span class="status-dot"></span>${status.label}`;
   }
+}
+
+function quickAdjust(id, delta) {
+  const p = currentProducts.find(x => String(x.id) === String(id));
+  if (!p) return;
+  const next = Math.max(0, (Number(p.quantity) || 0) + delta);
+  p.quantity = next; // update local state instantly, no network wait
+
+  updateCardDOM(id, next);
+  renderStats(currentProducts);
+
+  const card = document.querySelector(`.item-card[data-id="${id}"]`);
+  if (card) {
+    card.classList.add('flash');
+    setTimeout(() => card.classList.remove('flash'), 400);
+  }
+
+  // rapid-fire clicks on the same item coalesce into a single save
+  clearTimeout(pendingWrites[id]);
+  pendingWrites[id] = setTimeout(async () => {
+    try {
+      await Store.updateProduct(id, { quantity: next });
+    } catch (e) {
+      alert(e.message || 'Could not update quantity.');
+      await renderAll(); // re-sync with the server if the save failed
+    }
+  }, 350);
 }
 
 ['search-input', 'filter-status', 'sort-select'].forEach(id => {
