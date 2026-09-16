@@ -1,9 +1,10 @@
 :root{
-  --bg:#0b0a08;
-  --surface:#131110;
-  --surface-2:#1b1815;
-  --line:#2b271e;
-  --line-soft:#211d17;
+  /* Warm charcoal palette: softer than pure black while keeping the existing text/title colors. */
+  --bg:#171410;
+  --surface:#211d18;
+  --surface-2:#29241e;
+  --line:#3a3329;
+  --line-soft:#312b23;
   --gold:#b6914f;
   --gold-dim:#8a7440;
   --text:#efe9dd;
@@ -390,14 +391,18 @@ button{-webkit-tap-highlight-color:transparent;}
   display:flex;
   align-items:center;
   justify-content:space-between;
+  gap:10px;
   margin-top:14px;
   padding-top:14px;
   border-top:1px solid var(--line-soft);
+  min-width:0;
 }
 .stepper{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:7px;
+  min-width:0;
+  flex:1 1 auto;
 }
 .step-btn{
   width:34px;height:34px;
@@ -418,8 +423,18 @@ button{-webkit-tap-highlight-color:transparent;}
 .qty-num{
   font-family:var(--serif);
   font-size:1.3rem;
-  min-width:34px;
+  min-width:28px;
   text-align:center;
+  flex:0 1 auto;
+}
+.unit-badge{
+  flex:0 0 auto;
+  white-space:nowrap;
+  border:1px solid var(--line);
+  color:var(--text-dim);
+  padding:7px 8px;
+  font-size:0.68rem;
+  letter-spacing:0.04em;
 }
 .qty-label{
   font-size:0.72rem;
@@ -429,6 +444,7 @@ button{-webkit-tap-highlight-color:transparent;}
 .card-actions{
   display:flex;
   gap:6px;
+  flex:0 0 auto;
 }
 .icon-btn{
   background:transparent;
@@ -445,6 +461,38 @@ button{-webkit-tap-highlight-color:transparent;}
 }
 .icon-btn:hover{border-color:var(--gold-dim); color:var(--gold);}
 .icon-btn.del:hover{border-color:#5a3c34; color:var(--bad);}
+
+/* ---------- responsive card controls ---------- */
+@media (max-width: 760px){
+  .item-card{padding:15px;}
+}
+
+@media (max-width: 520px){
+  .stock-grid{grid-template-columns:1fr;}
+  .qty-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:8px;
+  }
+  .stepper{gap:6px;}
+  .step-btn{width:34px;height:34px;flex:none;}
+  .card-actions{justify-self:end;}
+}
+
+/* Handles narrow cards when several cards are visible side-by-side. */
+@media (min-width: 521px) and (max-width: 980px){
+  .qty-row{
+    flex-wrap:wrap;
+    justify-content:flex-start;
+  }
+  .stepper{
+    flex:1 1 145px;
+  }
+  .card-actions{
+    margin-left:auto;
+  }
+}
 
 .empty-state{
   text-align:center;
