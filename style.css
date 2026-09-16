@@ -64,8 +64,84 @@ button{-webkit-tap-highlight-color:transparent;}
   min-height:100dvh;
   display:none;
   animation:fadeIn .5s ease;
+  position:relative;
+  z-index:1;
 }
 .screen.active{display:block;}
+
+/* ---------- Aurora background (vanilla CSS port of React Bits' Aurora) ---------- */
+.aurora-bg{
+  position:fixed;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+}
+.aurora-bg span{
+  position:absolute;
+  border-radius:50%;
+  filter:blur(90px);
+  opacity:.6;
+  mix-blend-mode:screen;
+  will-change:transform;
+}
+.aurora-bg span:nth-child(1){
+  top:-22%; left:-12%;
+  width:60vw; height:60vw;
+  background:radial-gradient(circle at 40% 40%, rgba(242,221,170,.55), rgba(182,145,79,.26) 45%, transparent 70%);
+  animation:auroraDrift1 26s ease-in-out infinite alternate;
+}
+.aurora-bg span:nth-child(2){
+  top:8%; right:-16%;
+  width:55vw; height:55vw;
+  background:radial-gradient(circle at 60% 50%, rgba(182,145,79,.42), rgba(138,116,64,.20) 50%, transparent 72%);
+  animation:auroraDrift2 32s ease-in-out infinite alternate;
+  animation-delay:-6s;
+}
+.aurora-bg span:nth-child(3){
+  bottom:-26%; left:18%;
+  width:65vw; height:65vw;
+  background:radial-gradient(circle at 50% 60%, rgba(207,154,61,.32), rgba(23,19,15,0) 65%);
+  animation:auroraDrift3 38s ease-in-out infinite alternate;
+  animation-delay:-14s;
+}
+@keyframes auroraDrift1{
+  0%{ transform:translate(0,0) scale(1); }
+  100%{ transform:translate(6vw,8vh) scale(1.12); }
+}
+@keyframes auroraDrift2{
+  0%{ transform:translate(0,0) scale(1); }
+  100%{ transform:translate(-8vw,6vh) scale(1.08); }
+}
+@keyframes auroraDrift3{
+  0%{ transform:translate(0,0) scale(1); }
+  100%{ transform:translate(5vw,-7vh) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce){
+  .aurora-bg span{ animation:none; }
+}
+/* Touch devices: blur filters + continuous transform animation on huge
+   viewport-sized elements are the main GPU/battery cost. Drop both rather
+   than just shrinking them — use soft gradient stops to fake the blur look
+   for free, and freeze motion instead of animating every frame. */
+@media (hover:none) and (pointer:coarse){
+  .aurora-bg{ contain:strict; }
+  .aurora-bg span{
+    animation:none;
+    filter:none;
+    will-change:auto;
+    opacity:.4;
+  }
+  .aurora-bg span:nth-child(1){
+    width:90vw; height:90vw;
+    background:radial-gradient(circle at 40% 40%, rgba(242,221,170,.32), rgba(182,145,79,.14) 40%, transparent 68%);
+  }
+  .aurora-bg span:nth-child(2){
+    width:85vw; height:85vw;
+    background:radial-gradient(circle at 60% 50%, rgba(182,145,79,.26), rgba(138,116,64,.1) 45%, transparent 70%);
+  }
+  .aurora-bg span:nth-child(3){ display:none; }
+}
 @keyframes fadeIn{
   from{opacity:0; transform:translateY(6px);}
   to{opacity:1; transform:translateY(0);}
