@@ -113,6 +113,7 @@
       <div class="panel-grid">
         <div class="field"><label for="f-name">Item name</label><input type="text" id="f-name" placeholder="e.g. Dish soap"/></div>
         <div class="field"><label for="f-qty">Quantity</label><input type="number" id="f-qty" min="0" step="1" /></div>
+        <div class="field"><label for="f-unit">Unit</label><select id="f-unit"><option value="PCS">PCS</option><option value="PACK">PACK</option><option value="CASE">CASE</option></select></div>
       </div>
       <div class="error-msg" id="panel-error"></div>
       <div class="panel-actions">
@@ -300,6 +301,7 @@ function renderGrid(products) {
   grid.innerHTML = list.map(p => {
     const status = computeStatus(p, lowStockThreshold);
     const qty = Number(p.quantity) || 0;
+    const unit = ['PCS','PACK','CASE'].includes(String(p.unit || '').toUpperCase()) ? String(p.unit).toUpperCase() : 'PCS';
     return `
       <div class="item-card" data-id="${p.id}">
         <div class="item-name">${escapeHtml(p.name)}</div>
@@ -307,7 +309,7 @@ function renderGrid(products) {
         <div class="qty-row">
           <div class="stepper">
             <button class="step-btn minus-btn" data-id="${p.id}" aria-label="Decrease quantity">−</button>
-            <span class="qty-num">${qty}</span>
+            <span class="qty-num">${qty}</span><span class="unit-badge">${unit}</span>
             <button class="step-btn plus-btn" data-id="${p.id}" aria-label="Increase quantity">+</button>
           </div>
           <div class="card-actions">
@@ -330,6 +332,9 @@ function updateCardDOM(id, qty) {
   if (!card) return;
   const numEl = card.querySelector('.qty-num');
   if (numEl) numEl.textContent = qty;
+  const p = currentProducts.find(x => String(x.id) === String(id));
+  const unitEl = card.querySelector('.unit-badge');
+  if (unitEl) unitEl.textContent = ['PCS','PACK','CASE'].includes(String(p?.unit || '').toUpperCase()) ? String(p.unit).toUpperCase() : 'PCS';
   const pill = card.querySelector('.status-pill');
   if (pill) {
     const status = computeStatus({ quantity: qty }, lowStockThreshold);
@@ -384,6 +389,7 @@ document.getElementById('add-btn').addEventListener('click', () => {
   document.getElementById('item-id').value = '';
   document.getElementById('f-name').value = '';
   document.getElementById('f-qty').value = '';
+  document.getElementById('f-unit').value = 'PCS';
   document.getElementById('panel-error').textContent = '';
   document.getElementById('item-panel').classList.add('open');
   document.getElementById('f-name').focus();
@@ -400,6 +406,7 @@ async function openEdit(id) {
     document.getElementById('item-id').value = p.id;
     document.getElementById('f-name').value = p.name || '';
     document.getElementById('f-qty').value = p.quantity ?? '';
+    document.getElementById('f-unit').value = ['PCS','PACK','CASE'].includes(String(p.unit || '').toUpperCase()) ? String(p.unit).toUpperCase() : 'PCS';
     document.getElementById('panel-error').textContent = '';
     document.getElementById('item-panel').classList.add('open');
     document.getElementById('f-name').focus();
@@ -413,14 +420,16 @@ document.getElementById('cancel-item-btn').addEventListener('click', closePanels
 document.getElementById('save-item-btn').addEventListener('click', async () => {
   const name = document.getElementById('f-name').value.trim();
   const qtyRaw = document.getElementById('f-qty').value;
+  const unit = document.getElementById('f-unit').value;
   const err = document.getElementById('panel-error');
   err.textContent = '';
 
   if (!name) { err.textContent = 'Item name is required.'; return; }
   if (qtyRaw === '' || !Number.isInteger(Number(qtyRaw)) || Number(qtyRaw) < 0) { err.textContent = 'Enter a whole quantity (0 or more).'; return; }
+  if (!['PCS','PACK','CASE'].includes(unit)) { err.textContent = 'Choose PCS, PACK, or CASE.'; return; }
 
   try {
-    const payload = { name, quantity: Number(qtyRaw) };
+    const payload = { name, quantity: Number(qtyRaw), unit };
     if (editingId) await Store.updateProduct(editingId, payload);
     else await Store.addProduct(payload);
     closePanels();

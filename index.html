@@ -365,7 +365,7 @@ function renderPurchaseList(products) {
         <div class="purchase-item">
           <span class="purchase-index">${i + 1}</span>
           <span class="purchase-name">${escapeHtml(p.name)}</span>
-          <span class="purchase-qty">0</span>
+          <span class="purchase-qty">0 ${['PCS','PACK','CASE'].includes(String(p.unit || '').toUpperCase()) ? String(p.unit).toUpperCase() : 'PCS'}</span>
         </div>
       `).join('')
     : '<div class="purchase-empty"><span>✓</span> All items currently have stock.</div>';
@@ -373,7 +373,7 @@ function renderPurchaseList(products) {
   if (lowItems.length) {
     lowWrap.style.display = 'block';
     lowListEl.innerHTML = lowItems.map(p => `
-      <span class="purchase-low-item">${escapeHtml(p.name)} <strong>${Number(p.quantity) || 0}</strong></span>
+      <span class="purchase-low-item">${escapeHtml(p.name)} <strong>${Number(p.quantity) || 0} ${['PCS','PACK','CASE'].includes(String(p.unit || '').toUpperCase()) ? String(p.unit).toUpperCase() : 'PCS'}</strong></span>
     `).join('');
   } else {
     lowWrap.style.display = 'none';
@@ -381,16 +381,16 @@ function renderPurchaseList(products) {
   }
 
   copyBtn.disabled = outItems.length === 0;
-  copyBtn.dataset.items = JSON.stringify(outItems.map(p => p.name || ''));
+  copyBtn.dataset.items = JSON.stringify(outItems.map(p => ({ name: p.name || '', unit: ['PCS','PACK','CASE'].includes(String(p.unit || '').toUpperCase()) ? String(p.unit).toUpperCase() : 'PCS' })));
   panel.classList.toggle('has-items', outItems.length > 0);
 }
 
 async function copyBuyList() {
   const button = document.getElementById('copy-buy-list');
-  const names = JSON.parse(button.dataset.items || '[]');
-  if (!names.length) return;
+  const items = JSON.parse(button.dataset.items || '[]');
+  if (!items.length) return;
 
-  const text = `EXTRAVAGANZA BEAUTÉ — ITEMS TO BUY\n\n${names.map((name, i) => `${i + 1}. ${name}`).join('\n')}`;
+  const text = `EXTRAVAGANZA BEAUTÉ — ITEMS TO BUY\n\n${items.map((item, i) => `${i + 1}. ${item.name} — 0 ${item.unit}`).join('\n')}`;
 
   try {
     await navigator.clipboard.writeText(text);
@@ -447,13 +447,14 @@ function renderGrid(products) {
   grid.innerHTML = list.map(p => {
     const status = computeStatus(p, lowStockThreshold);
     const qty = Number(p.quantity) || 0;
+    const unit = ['PCS','PACK','CASE'].includes(String(p.unit || '').toUpperCase()) ? String(p.unit).toUpperCase() : 'PCS';
     return `
       <div class="item-card" data-id="${p.id}">
         <div class="item-name">${escapeHtml(p.name)}</div>
         <span class="status-pill status-${status.key}"><span class="status-dot"></span>${status.label}</span>
         <div class="qty-row">
           <span class="qty-label">Quantity</span>
-          <span class="qty-num">${qty}</span>
+          <span class="qty-num">${qty}</span><span class="unit-badge">${unit}</span>
         </div>
       </div>
     `;

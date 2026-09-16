@@ -646,3 +646,25 @@ body.ui-modal-lock{overflow:hidden;}
   .purchase-actions{display:grid; grid-template-columns:1fr 1fr;}
   .purchase-actions .btn{width:100%; padding-left:8px; padding-right:8px;}
 }
+
+
+/* Stock units */
+.unit-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:38px;
+  padding:4px 7px;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  color:var(--text-dim);
+  font-size:.66rem;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.qty-row .unit-badge{margin-left:6px;}
+.purchase-qty{white-space:nowrap;}
+@media (max-width:520px){
+  .unit-badge{min-width:34px; padding:4px 6px; font-size:.62rem;}
+}

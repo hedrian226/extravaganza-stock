@@ -25,6 +25,7 @@ function mapItem(row) {
     id: row.id,
     name: row.name,
     quantity: Number(row.quantity) || 0,
+    unit: ['PCS', 'PACK', 'CASE'].includes(String(row.unit || '').toUpperCase()) ? String(row.unit).toUpperCase() : 'PCS',
     updatedAt: row.updated_at,
   };
 }
@@ -42,7 +43,7 @@ const Store = {
 
     const { data, error } = await supabaseClient
       .from('items')
-      .select('id,name,quantity,updated_at')
+      .select('id,name,quantity,unit,updated_at')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
@@ -59,9 +60,10 @@ const Store = {
       .insert({
         name: product.name,
         quantity: Number(product.quantity) || 0,
+        unit: ['PCS', 'PACK', 'CASE'].includes(String(product.unit || '').toUpperCase()) ? String(product.unit).toUpperCase() : 'PCS',
         user_id: user.id,
       })
-      .select('id,name,quantity,updated_at')
+      .select('id,name,quantity,unit,updated_at')
       .single();
 
     if (error) throw error;
@@ -75,6 +77,7 @@ const Store = {
     const update = {};
     if (patch.name !== undefined) update.name = patch.name;
     if (patch.quantity !== undefined) update.quantity = Number(patch.quantity) || 0;
+    if (patch.unit !== undefined) update.unit = ['PCS', 'PACK', 'CASE'].includes(String(patch.unit || '').toUpperCase()) ? String(patch.unit).toUpperCase() : 'PCS';
     update.updated_at = new Date().toISOString();
 
     const { data, error } = await supabaseClient
@@ -82,7 +85,7 @@ const Store = {
       .update(update)
       .eq('id', id)
       .eq('user_id', user.id)
-      .select('id,name,quantity,updated_at')
+      .select('id,name,quantity,unit,updated_at')
       .single();
 
     if (error) throw error;
