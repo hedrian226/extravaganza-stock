@@ -716,3 +716,235 @@ body.ui-modal-lock{overflow:hidden;}
 @media (max-width:520px){
   .unit-badge{min-width:34px; padding:4px 6px; font-size:.62rem;}
 }
+
+/* ==========================================================
+   EXTRAVAGANZA BEAUTÉ — PREMIUM UI REFRESH
+   Design-only layer. No application logic or data behavior changed.
+   ========================================================== */
+:root{
+  --bg:#17130f;
+  --bg-deep:#120f0c;
+  --surface:#211b16;
+  --surface-2:#29221b;
+  --surface-3:#30281f;
+  --line:#40372d;
+  --line-soft:#342d25;
+  --gold:#b6914f;
+  --gold-dim:#8a7440;
+  --text:#efe9dd;
+  --text-dim:#aaa08f;
+  --text-faint:#746b5c;
+  --ok:#8fa784;
+  --bad:#bd7661;
+  --warn:#d0a04b;
+  --shadow:0 14px 38px rgba(0,0,0,.18);
+  --shadow-soft:0 7px 22px rgba(0,0,0,.14);
+}
+
+body{
+  background:
+    radial-gradient(900px 520px at 10% -8%, rgba(182,145,79,.075), transparent 62%),
+    radial-gradient(780px 500px at 100% 15%, rgba(132,103,64,.055), transparent 65%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+}
+
+/* 1 — Softer premium shell */
+.topbar{
+  padding:18px 22px;
+  background:rgba(23,19,15,.82);
+  border-bottom-color:rgba(182,145,79,.14);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  position:sticky;
+  top:0;
+  z-index:50;
+}
+.container{padding-top:30px;}
+
+/* 2 — Refined stats dashboard */
+.stats-strip{
+  border:0;
+  gap:10px;
+  margin-bottom:26px;
+}
+.stat{
+  background:linear-gradient(145deg, rgba(41,34,27,.92), rgba(31,26,21,.92));
+  border:1px solid var(--line-soft);
+  border-radius:10px;
+  padding:20px 16px;
+  box-shadow:var(--shadow-soft);
+  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+}
+.stat:last-child{border-right:1px solid var(--line-soft);}
+.stat:hover{transform:translateY(-2px);border-color:rgba(182,145,79,.28);}
+.stat-num{font-size:2.05rem;}
+.stat-label{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;}
+
+/* 3 — Search and filters */
+.controls{
+  padding:12px;
+  margin-bottom:24px;
+  background:rgba(33,27,22,.68);
+  border:1px solid var(--line-soft);
+  border-radius:10px;
+  box-shadow:var(--shadow-soft);
+}
+.controls input[type="text"],.controls select{
+  background:rgba(23,19,15,.82);
+  border-color:var(--line);
+  border-radius:8px;
+  min-height:44px;
+}
+.controls input[type="text"]{padding-left:14px;}
+.controls input[type="text"]::placeholder{color:var(--text-faint);}
+.controls input[type="text"]:focus,.controls select:focus{
+  border-color:var(--gold-dim);
+  box-shadow:0 0 0 3px rgba(182,145,79,.08);
+}
+
+/* 4 — Premium buttons */
+.btn{border-radius:8px;transition:transform .16s ease,background .16s ease,color .16s ease,border-color .16s ease,box-shadow .16s ease;}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.16);}
+.btn.primary{box-shadow:0 6px 18px rgba(182,145,79,.10);}
+.btn.ghost{background:rgba(255,255,255,.015);}
+.btn.small{border-radius:7px;}
+
+/* 5 — Product cards */
+.stock-grid{
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;
+}
+.item-card{
+  background:linear-gradient(150deg,rgba(38,31,25,.97),rgba(29,25,21,.97));
+  border:1px solid var(--line-soft);
+  border-radius:12px;
+  padding:19px;
+  box-shadow:var(--shadow-soft);
+  overflow:hidden;
+  transition:background .18s ease,border-color .18s ease,opacity .4s ease,transform .18s ease,box-shadow .18s ease;
+}
+.item-card:hover{
+  background:linear-gradient(150deg,rgba(43,35,28,.99),rgba(31,26,22,.99));
+  border-color:rgba(182,145,79,.28);
+  box-shadow:var(--shadow);
+  transform:translateY(-2px);
+}
+.item-card.flash{border-color:var(--gold);box-shadow:0 0 0 2px rgba(182,145,79,.08),var(--shadow);}
+.item-name{font-size:1.28rem;margin-bottom:13px;}
+
+/* 6 — Clearer stock badges */
+.status-pill{
+  padding:7px 11px;
+  border-radius:999px;
+  font-size:.7rem;
+  font-weight:400;
+  background:rgba(255,255,255,.025);
+}
+.status-in{border-color:rgba(143,167,132,.38);background:rgba(143,167,132,.08);}
+.status-low{border-color:rgba(208,160,75,.42);background:rgba(208,160,75,.09);}
+.status-out{border-color:rgba(189,118,97,.42);background:rgba(189,118,97,.09);}
+.status-dot{width:7px;height:7px;box-shadow:0 0 8px currentColor;}
+
+/* 7 — Better quantity/action control group */
+.qty-row{
+  margin-top:16px;
+  padding-top:16px;
+  gap:10px;
+}
+.stepper{gap:6px;}
+.step-btn,.icon-btn{
+  border-radius:7px;
+  background:rgba(255,255,255,.018);
+}
+.step-btn:hover,.icon-btn:hover{background:rgba(182,145,79,.07);}
+.qty-num{font-size:1.4rem;}
+.unit-badge{
+  min-width:42px;
+  padding:7px 8px;
+  border-radius:7px;
+  color:var(--gold);
+  border-color:rgba(182,145,79,.25);
+  background:rgba(182,145,79,.055);
+}
+.icon-btn.del:hover{background:rgba(189,118,97,.08);}
+
+/* 8 — Add/edit/settings panels */
+.panel,.purchase-panel{
+  background:linear-gradient(150deg,rgba(38,31,25,.97),rgba(29,25,21,.97));
+  border-color:var(--line-soft);
+  border-radius:12px;
+  box-shadow:var(--shadow-soft);
+}
+.panel{padding:24px;}
+.field input,.field select{
+  border-radius:8px;
+  background:rgba(23,19,15,.78);
+}
+.field input:focus,.field select:focus{box-shadow:0 0 0 3px rgba(182,145,79,.08);}
+
+/* 9 — Shopping list: clearer hierarchy */
+.purchase-panel{
+  padding:22px;
+  margin-bottom:24px;
+  background:
+    radial-gradient(500px 180px at 0% 0%,rgba(182,145,79,.07),transparent 65%),
+    linear-gradient(150deg,rgba(38,31,25,.98),rgba(29,25,21,.98));
+}
+.purchase-panel.has-items{border-color:rgba(189,118,97,.34);}
+.purchase-count{border-radius:999px;background:rgba(189,118,97,.07);}
+.purchase-item{padding:12px 2px;}
+.purchase-index{background:rgba(255,255,255,.02);}
+.purchase-qty{border-radius:999px;background:rgba(189,118,97,.07);}
+.purchase-low-item{border-radius:999px;background:rgba(208,160,75,.07);}
+
+/* 10 — Empty states / footer polish */
+.empty-state{
+  border-radius:12px;
+  background:rgba(33,27,22,.55);
+  border-color:var(--line);
+}
+.footnote{letter-spacing:.02em;}
+
+/* Mobile: make every card control group impossible to overflow. */
+@media (max-width:900px){
+  .qty-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    gap:10px;
+  }
+  .stepper{width:100%;}
+  .card-actions{
+    width:100%;
+    justify-content:flex-end;
+    margin-left:0;
+  }
+}
+
+@media (max-width:600px){
+  .topbar{padding:15px 16px;}
+  .topbar-right{width:100%;}
+  .topbar-right .btn{flex:1 1 auto;}
+  .container{padding:22px 14px 54px;}
+  .stats-strip{gap:8px;}
+  .stat{padding:16px 10px;border-radius:9px;}
+  .stat-num{font-size:1.75rem;}
+  .controls{padding:10px;gap:8px;}
+  .controls input[type="text"],.controls select{flex:1 1 100%;width:100%;}
+  .stock-grid{grid-template-columns:1fr;gap:12px;}
+  .item-card{padding:17px;border-radius:11px;}
+  .purchase-head{align-items:flex-start;}
+}
+
+@media (max-width:400px){
+  .stats-strip{grid-template-columns:1fr 1fr;}
+  .stat:nth-child(2){border-right:1px solid var(--line-soft);}
+  .stat{border-bottom:1px solid var(--line-soft);}
+  .stat:nth-last-child(-n+2){border-bottom:none;}
+  .step-btn{width:36px;height:36px;}
+  .icon-btn{width:36px;height:36px;}
+  .unit-badge{min-width:44px;}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .stat:hover,.item-card:hover,.btn:hover{transform:none;}
+}
