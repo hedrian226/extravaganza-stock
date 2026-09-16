@@ -117,6 +117,36 @@
 
     <p class="footnote">This shows what's currently in stock. To make changes, contact the person who manages it.</p>
   </div>
+
+  <footer class="site-footer" aria-label="Footer">
+    <div class="site-footer-inner">
+      <div class="site-footer-brand">
+        <span>EXTRAVAGANZA BEAUTÉ</span>
+        <small>Stock made simple.</small>
+      </div>
+      <button class="footer-instructions" type="button" id="footer-instructions-btn">Instructions</button>
+      <div class="site-footer-credit">
+        <span>CREATED BY : EDRIAN</span>
+        <a href="https://edrian-vibe-portfolio.vercel.app/" target="_blank" rel="noopener noreferrer">Portfolio ↗</a>
+      </div>
+    </div>
+  </footer>
+
+  <div class="footer-help-overlay" id="footer-help-overlay" aria-hidden="true">
+    <div class="footer-help-backdrop" data-close-help></div>
+    <section class="footer-help-card" role="dialog" aria-modal="true" aria-labelledby="footer-help-title">
+      <button class="footer-help-close" type="button" id="footer-help-close" aria-label="Close instructions">×</button>
+      <div class="footer-help-kicker">QUICK GUIDE</div>
+      <h2 id="footer-help-title">How to check stock</h2>
+      <div class="footer-help-list">
+        <div><strong>1. Search</strong><span>Type a product name to find it quickly.</span></div>
+        <div><strong>2. Check status</strong><span>Green means available, amber means low, and red means no stock.</span></div>
+        <div><strong>3. Check the unit</strong><span>Quantity is shown as PCS, PACK, or CASE.</span></div>
+        <div><strong>4. Shopping list</strong><span>Items that need attention appear in the purchase list.</span></div>
+      </div>
+      <p class="footer-help-note">Tip: On mobile, use the search box first to find an item instead of scrolling through the whole list.</p>
+    </section>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -465,6 +495,27 @@ function renderGrid(products) {
   document.getElementById(id).addEventListener('input', () => renderGrid(viewerProducts));
   document.getElementById(id).addEventListener('change', () => renderGrid(viewerProducts));
 });
+
+// Footer instructions
+const footerInstructionsBtn = document.getElementById('footer-instructions-btn');
+const footerHelpOverlay = document.getElementById('footer-help-overlay');
+const footerHelpClose = document.getElementById('footer-help-close');
+function openFooterHelp(){
+  if (!footerHelpOverlay) return;
+  footerHelpOverlay.classList.add('open');
+  footerHelpOverlay.setAttribute('aria-hidden','false');
+  document.body.classList.add('footer-help-lock');
+}
+function closeFooterHelp(){
+  if (!footerHelpOverlay) return;
+  footerHelpOverlay.classList.remove('open');
+  footerHelpOverlay.setAttribute('aria-hidden','true');
+  document.body.classList.remove('footer-help-lock');
+}
+footerInstructionsBtn?.addEventListener('click', openFooterHelp);
+footerHelpClose?.addEventListener('click', closeFooterHelp);
+footerHelpOverlay?.addEventListener('click', (e) => { if (e.target.hasAttribute('data-close-help')) closeFooterHelp(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFooterHelp(); });
 
 boot();
 </script>
