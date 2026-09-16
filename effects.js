@@ -24,11 +24,34 @@
     var grid = document.getElementById('stock-grid');
     if (!grid) return;
 
-    revealNew(Array.prototype.slice.call(grid.querySelectorAll('.item-card:not(.reveal-in)')));
+    var firstPaintDone = false;
+
+    // Background polling replaces the whole grid's innerHTML, so every card
+    // — even ones whose data didn't change — comes back as a "new" node.
+    // Only the very first paint should get the staggered fade; every
+    // refresh after that should snap in instantly with no visible flash.
+    function settleInstant(nodes) {
+      nodes.forEach(function (n) { n.classList.add('reveal-instant', 'reveal-in'); });
+      requestAnimationFrame(function () {
+        nodes.forEach(function (n) { n.classList.remove('reveal-instant'); });
+      });
+    }
+
+    var initial = Array.prototype.slice.call(grid.querySelectorAll('.item-card:not(.reveal-in)'));
+    if (initial.length) {
+      revealNew(initial);
+      firstPaintDone = true;
+    }
 
     var mo = new MutationObserver(function () {
       var fresh = Array.prototype.slice.call(grid.querySelectorAll('.item-card:not(.reveal-in)'));
-      if (fresh.length) revealNew(fresh);
+      if (!fresh.length) return;
+      if (!firstPaintDone) {
+        revealNew(fresh);
+        firstPaintDone = true;
+      } else {
+        settleInstant(fresh);
+      }
     });
     mo.observe(grid, { childList: true });
   }

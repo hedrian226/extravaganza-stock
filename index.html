@@ -21,8 +21,21 @@
 </head>
 <body>
 
+<!-- ========================= LOADING ========================= -->
+<div class="screen active" id="screen-loading">
+  <div class="loader-wrap">
+    <span class="wordmark">Extravaganza<span> Beauté</span></span>
+    <div class="rb-loader" role="status" aria-live="polite">
+      <span class="rb-loader-track"></span>
+      <span class="rb-loader-arc"></span>
+      <span class="rb-loader-core"></span>
+    </div>
+    <p class="loader-status" id="loader-status">Checking your stock…</p>
+  </div>
+</div>
+
 <!-- ========================= NOT SET UP YET ========================= -->
-<div class="screen active" id="screen-notready">
+<div class="screen" id="screen-notready">
   <div class="auth-wrap">
     <div class="auth-card">
       <span class="wordmark">Extravaganza<span> Beauté</span></span>
@@ -177,12 +190,25 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
+function setLoaderStatus(text) {
+  const el = document.getElementById('loader-status');
+  if (el) el.textContent = text;
+}
+
+// Keeps the loader on screen for a minimum stretch so it never just flashes
+// past on a fast connection — that flash reads as glitchy, not fast.
+function withMinDelay(promise, ms = 450) {
+  return Promise.all([promise, new Promise(r => setTimeout(r, ms))]).then(([v]) => v);
+}
+
 async function boot() {
+  showScreen('screen-loading');
   loadSession();
 
   if (session && session.signedIn && session.code) {
+    setLoaderStatus('Checking your stock…');
     try {
-      const result = await Store.getViewerProducts(session.code);
+      const result = await withMinDelay(Store.getViewerProducts(session.code));
       if (result.ok) {
         viewerProducts = result.products;
         lowStockThreshold = result.lowStockThreshold;
@@ -288,8 +314,10 @@ document.getElementById('signout-btn').addEventListener('click', () => {
 });
 
 async function enterApp() {
+  showScreen('screen-loading');
+  setLoaderStatus('Loading your stock list…');
+  await withMinDelay(renderAll());
   showScreen('screen-app');
-  await renderAll();
   startAutoRefresh();
 }
 
