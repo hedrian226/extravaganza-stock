@@ -626,13 +626,13 @@ const footerHelpOverlay = document.getElementById('footer-help-overlay');
 const footerHelpClose = document.getElementById('footer-help-close');
 function openFooterHelp(){
   if (!footerHelpOverlay) return;
-  footerHelpOverlay.classList.add('open');
+  footerHelpOverlay.classList.add('is-open');
   footerHelpOverlay.setAttribute('aria-hidden','false');
   document.body.classList.add('footer-help-lock');
 }
 function closeFooterHelp(){
   if (!footerHelpOverlay) return;
-  footerHelpOverlay.classList.remove('open');
+  footerHelpOverlay.classList.remove('is-open');
   footerHelpOverlay.setAttribute('aria-hidden','true');
   document.body.classList.remove('footer-help-lock');
 }
